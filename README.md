@@ -313,6 +313,8 @@ ControllerFirmware/         ← Controller firmware (the student kit ships it as
 lib/                        ← Hardware drivers (HexaServos, HexaIMU, HexaOLED, HexaPower, HexaLED, HexaHAL)
 tools/                      ← Project and OpMode generators, Blocks editor
 ```
+---
+
 Git pull and push commands 
 
 git pull origin main
@@ -332,3 +334,11 @@ git push origin main
 ## License
 
 MIT — free to use, modify, and distribute for educational and competition purposes.
+---
+About Teach and repeat feature 
+
+**Teach & Repeat AI** is a TeleOp that lets a driver record a robot routine and replay it autonomously. It’s registered in the Controller menu as **Teach & Repeat AI**.
+
+During recording, it captures drive input, arm and gripper positions, and IMU heading at 20 samples per second, for up to 60 seconds. The recording stays in RAM; it isn’t saved across OpMode restarts. Optimization trims idle time from the start and end, compresses the routine’s timing, and boosts straight driving slightly. During playback, the OpMode uses IMU heading correction and battery-voltage compensation.
+
+**Main controls:** `X` starts and stops recording; stopping also optimizes the routine. `Y` optimizes it again, and `A` starts playback or stops it early. `LT` aborts to manual control. `LB` toggles the gripper, the D-pad adjusts the arm or replay speed, and the sticks drive manually.
