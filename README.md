@@ -315,7 +315,7 @@ tools/                      ← Project and OpMode generators, Blocks editor
 ```
 ---
 
-Git pull and push commands 
+## Git pull and push commands 
 
 git pull origin main
 
