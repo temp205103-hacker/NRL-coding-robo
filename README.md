@@ -313,6 +313,19 @@ ControllerFirmware/         ← Controller firmware (the student kit ships it as
 lib/                        ← Hardware drivers (HexaServos, HexaIMU, HexaOLED, HexaPower, HexaLED, HexaHAL)
 tools/                      ← Project and OpMode generators, Blocks editor
 ```
+Git pull and push commands 
+
+git pull origin main
+
+ Commit and push your changes:
+ git status
+git add <files>
+git commit -m "Describe your changes"
+git push origin main
+
+To push an existing commit, just run:
+git push origin main
+
 
 ---
 
