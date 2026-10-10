@@ -335,7 +335,7 @@ git push origin main
 
 MIT — free to use, modify, and distribute for educational and competition purposes.
 ---
-About Teach and repeat feature 
+## About Teach and repeat feature 
 
 **Teach & Repeat AI** is a TeleOp that lets a driver record a robot routine and replay it autonomously. It’s registered in the Controller menu as **Teach & Repeat AI**.
 
