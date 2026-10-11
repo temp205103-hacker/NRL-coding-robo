@@ -13,6 +13,9 @@
 //    4. Vault Golden Core retrieve & Star Pole alignment (+7 pts + Star Bonus)
 //    5. Endgame Level Up: Space Station climb, active IMU balance (+15 pts),
 //       and Apex Pole score (+9 pts).
+//
+//  INCLUDES: Smart Obstacle & Wall Collision Avoidance (Halts or dynamically reroutes
+//  if unexpected field debris or misalignment occurs).
 // ============================================================================
 
 class AIDriverSkillsChallenge : public NRLOpMode {
@@ -32,65 +35,65 @@ public:
             // ── Phase 1: Spike Mark 1 & High Pole Stack 1 ─────────────────
             AIDriver::armFloor(),
             AIDriver::openGripper(),
-            driveActions.driveInches(26), // Reach Spike Mark 1
-            AIDriver::closeGripper(),     // Clamp Core 1
+            AIDriver::smartDriveInches(26, 35.0f), // Reach Spike Mark 1 safely
+            AIDriver::closeGripper(),              // Clamp Core 1
             sleep_ms(300),
             AIDriver::armCarry(),
-            driveActions.driveInches(14), // Approach High Pole
-            AIDriver::armHighPole(),      // Elevate
+            AIDriver::smartDriveInches(14, 30.0f), // Approach High Pole
+            AIDriver::armHighPole(),               // Elevate
             sleep_ms(400),
-            AIDriver::openGripper(),      // Score Core 1 (+3 pts)
+            AIDriver::openGripper(),               // Score Core 1 (+3 pts)
             sleep_ms(250),
             AIDriver::armCarry(),
-            driveActions.driveInches(-10),
+            AIDriver::smartDriveInches(-10, -30.0f),
 
             // ── Phase 2: Spike Mark 2 & High Pole Stack 2 ─────────────────
             driveActions.turn(35),
-            driveActions.driveInches(18), // Reach Spike Mark 2
+            AIDriver::smartDriveInches(18, 30.0f), // Reach Spike Mark 2
             AIDriver::armFloor(),
-            AIDriver::closeGripper(),     // Clamp Core 2
+            AIDriver::closeGripper(),              // Clamp Core 2
             sleep_ms(300),
             AIDriver::armCarry(),
             driveActions.turn(-35),
-            driveActions.driveInches(12), // Approach High Pole again
+            AIDriver::smartDriveInches(12, 30.0f), // Approach High Pole again
             AIDriver::armHighPole(),
             sleep_ms(400),
-            AIDriver::openGripper(),      // Stack Core 2 on High Pole (+3 pts)
+            AIDriver::openGripper(),               // Stack Core 2 on High Pole (+3 pts)
             sleep_ms(250),
             AIDriver::armCarry(),
-            driveActions.driveInches(-8),
+            AIDriver::smartDriveInches(-8, -30.0f),
 
             // ── Phase 3: Payload Retrieve & Drop Zone Placement ───────────
             driveActions.turn(-90),
-            driveActions.driveInches(28), // Navigate to Source Zone
+            AIDriver::smartDriveInches(28, 35.0f), // Navigate to Source Zone
             instant([] { cargoBay.setPosition(25.0f); }), // Clamp Payload in Cargo Bay
             sleep_ms(300),
-            driveActions.driveInches(-10),
-            driveActions.turn(180),       // Rotate toward Drop Zone
-            driveActions.driveInches(44), // Drive into Drop Zone
-            AIDriver::deployPayload(),    // Score Payload (+10 pts, unlocks early Starburst!)
+            AIDriver::smartDriveInches(-10, -30.0f),
+            driveActions.turn(180),                // Rotate toward Drop Zone
+            AIDriver::smartDriveInches(44, 35.0f), // Drive into Drop Zone with avoidance
+            AIDriver::deployPayload(),             // Score Payload (+10 pts, unlocks Starburst!)
             sleep_ms(300),
 
             // ── Phase 4: Vault Retrieval & Star Pole Scoring ──────────────
-            driveActions.driveInches(-14),
-            driveActions.turn(-90),       // Turn to Vault
-            driveActions.driveInches(22), // Reach Vault
+            AIDriver::smartDriveInches(-14, -30.0f),
+            driveActions.turn(-90),                // Turn to Vault
+            AIDriver::smartDriveInches(22, 30.0f), // Reach Vault safely
             AIDriver::openVaultGate(),
             sleep_ms(400),
             AIDriver::closeVaultGate(),
-            driveActions.turn(45),        // Turn to Star Pole
-            driveActions.driveInches(26),
+            driveActions.turn(45),                 // Turn to Star Pole
+            AIDriver::smartDriveInches(26, 35.0f),
             AIDriver::armHighPole(),
-            AIDriver::openGripper(),      // Score Golden Core (+7 pts)
+            AIDriver::openGripper(),               // Score Golden Core (+7 pts)
             AIDriver::armCarry(),
 
             // ── Phase 5: Space Station Balance & Apex Pole Finish ─────────
-            driveActions.turn(45),        // Turn to Space Station ramp
-            driveActions.driveInches(34), // Drive up onto platform
+            driveActions.turn(45),                 // Turn to Space Station ramp
+            AIDriver::smartDriveInches(34, 30.0f), // Drive up onto platform
             AIDriver::autoBalanceSpaceStation(6000), // Active closed-loop balance (+15 pts!)
-            AIDriver::armApexPole(),      // Elevate to Apex Pole (365mm)
+            AIDriver::armApexPole(),               // Elevate to Apex Pole (365mm)
             sleep_ms(500),
-            AIDriver::openGripper(),      // Score on Apex Pole (+9 pts!)
+            AIDriver::openGripper(),               // Score on Apex Pole (+9 pts!)
             sleep_ms(300),
             AIDriver::armCarry(),
             driveActions.stopAll(),
@@ -101,8 +104,9 @@ public:
     void loop() override {
         // Stream telemetry to Controller display
         telemetry.addData("Arena", "SKILLS SOLO");
-        telemetry.addData("Driver", "SELF-DRIVING");
-        telemetry.addData("Status", isActionRunning() ? "EXECUTING" : "FINISHED");
+        telemetry.addData("Driver", "SELF-DRIVING AI");
+        telemetry.addData("Obstacle", obstacleDetector.isObstacleAhead() ? "AVOIDING" : "CLEAR");
+        telemetry.addData("Dist(cm)", obstacleDetector.getFrontDistanceCm());
         telemetry.addData("Heading", NRLComms::getHeading());
         telemetry.addData("Batt(V)", power.getBatteryVoltage());
     }
@@ -112,5 +116,4 @@ public:
     }
 };
 
-// Register this OpMode as an AUTO OpMode for the Autonomous Skill Challenge
 REGISTER_OPMODE(AIDriverSkillsChallenge, "AI Driver: Skills", AUTO);

@@ -1,7 +1,7 @@
 #include "NRL.h"
 
 // ============================================================================
-//  Teach & Repeat AI OpMode (Demonstration Learning & Trajectory Optimization)
+//  Teach & Repeat AI OpMode (With Active Obstacle Avoidance & Rerouting)
 // ============================================================================
 //  Hardware:
 //    - Left DC Motor:  DIR = MOTOR_L_DIR, PWM = MOTOR_L_PWM
@@ -10,6 +10,7 @@
 //    - Gripper Servo:  Signal = SERVO_2 (startAngle = 20 deg)
 //    - IMU (Heading):  On-board LSM6DSOX (NRLComms::getHeading())
 //    - User RGB LED:   userLed
+//    - Distance Sensors: DIGITAL_D1 (Trig), DIGITAL_D2 (Echo), ADC_EXT_1 (IR)
 //
 //  Controls:
 //    - Sticks:             Drive manually (Left Y = fwd/rev, Right X = turn)
@@ -21,6 +22,11 @@
 //    - BTN_DPAD_RIGHT:     Increase Speedup Multiplier (1.0x -> 1.25x -> 1.5x -> 2.0x)
 //    - BTN_DPAD_LEFT:      Decrease Speedup Multiplier
 //    - BTN_LT:             Emergency Abort / Reset to Idle
+//
+//  NEW FEATURE: Real-Time Robot & Obstacle Collision Avoidance.
+//  During autonomous replay, if another robot or obstacle enters the path,
+//  the robot halts immediately, holds its place in the trajectory, and
+//  autonomously steers around the blockage before resuming!
 // ============================================================================
 
 // Declare hardware at file scope
@@ -40,7 +46,6 @@ struct TrajectoryPoint {
     uint32_t timeMs;        // millisecond timestamp relative to routine start
 };
 
-// Maximum recorded trajectory buffer (1200 points @ 20Hz = 60 seconds)
 static constexpr size_t MAX_POINTS = 1200;
 static constexpr uint32_t SAMPLE_INTERVAL_MS = 50; // 20 Hz capture rate
 
@@ -63,6 +68,7 @@ private:
     uint32_t _recordStartMs = 0;
     uint32_t _lastSampleMs = 0;
     uint32_t _replayStartMs = 0;
+    uint32_t _lastReplayTickMs = 0;
     size_t   _replayIdx = 0;
 
     // Mechanism state
@@ -75,17 +81,27 @@ private:
     float _gyroKp = 0.025f;          // Heading lock proportional correction gain
     float _nominalVoltage = 12.0f;   // Reference battery voltage for normalization
 
+    // Collision Avoidance State
+    bool     _obstacleDetected = false;
+    uint32_t _obstacleBlockedStartMs = 0;
+    bool     _inEvasiveBypass = false;
+    uint32_t _bypassStartMs = 0;
+
 public:
     void init() override {
-        // Initialize hardware
         arm.begin();
         gripper.begin();
         leftMotor.begin();
         rightMotor.begin();
 
+        pinMode(DIGITAL_D1, OUTPUT);
+        digitalWrite(DIGITAL_D1, LOW);
+        pinMode(DIGITAL_D2, INPUT);
+
         _state = STATE_MANUAL_IDLE;
         _rawCount = 0;
         _optCount = 0;
+        _inEvasiveBypass = false;
 
         userLed.setSolid(0, 120, 120); // Cyan: Idle Ready
     }
@@ -103,7 +119,7 @@ public:
         if (gamepad1.justPressed(BTN_DPAD_RIGHT)) {
             _speedupMultiplier += 0.15f;
             if (_speedupMultiplier > 2.50f) _speedupMultiplier = 2.50f;
-            if (_rawCount > 0) runOptimization(); // re-optimize with new speed
+            if (_rawCount > 0) runOptimization();
         }
         if (gamepad1.justPressed(BTN_DPAD_LEFT)) {
             _speedupMultiplier -= 0.15f;
@@ -113,14 +129,12 @@ public:
 
         // ── Manual Servo Controls ─────────────────────────────────────────
         if (_state != STATE_REPLAYING) {
-            // Gripper toggle
             if (gamepad1.justPressed(BTN_LB)) {
                 _gripperClosed = !_gripperClosed;
                 _targetGripper = _gripperClosed ? 90.0f : 20.0f;
                 gripper.setPosition(_targetGripper);
             }
 
-            // Arm step up / down
             if (gamepad1.justPressed(BTN_DPAD_UP)) {
                 _targetArm = constrain(_targetArm + 15.0f, 0.0f, 180.0f);
                 arm.setPosition(_targetArm);
@@ -137,16 +151,11 @@ public:
             case STATE_OPTIMIZED:
                 handleManualDrive();
 
-                // Button X: Start Recording
                 if (gamepad1.justPressed(BTN_X)) {
                     startRecording(now);
-                }
-                // Button Y: Optimize (if we have recorded points)
-                else if (gamepad1.justPressed(BTN_Y) && _rawCount > 0) {
+                } else if (gamepad1.justPressed(BTN_Y) && _rawCount > 0) {
                     runOptimization();
-                }
-                // Button A: Start Playback (if optimized)
-                else if (gamepad1.justPressed(BTN_A) && _optCount > 0) {
+                } else if (gamepad1.justPressed(BTN_A) && _optCount > 0) {
                     startReplay(now);
                 }
                 break;
@@ -155,7 +164,6 @@ public:
                 handleManualDrive();
                 recordSample(now);
 
-                // Button X: Stop Recording and auto-optimize
                 if (gamepad1.justPressed(BTN_X)) {
                     stopRecording();
                     runOptimization();
@@ -163,7 +171,6 @@ public:
                 break;
 
             case STATE_REPLAYING:
-                // Button A: Stop Replay early
                 if (gamepad1.justPressed(BTN_A)) {
                     abortToIdle();
                 } else {
@@ -172,7 +179,7 @@ public:
                 break;
         }
 
-        // ── Telemetry (Live on Controller LCD) ─────────────────────────────
+        // ── Telemetry ─────────────────────────────────────────────────────
         sendTelemetryStatus();
     }
 
@@ -188,6 +195,31 @@ private:
         drive.drive(gamepad1.leftY(), gamepad1.rightX());
     }
 
+    // ── Obstacle Sensing ──────────────────────────────────────────────────
+    float readFrontDistanceCm() {
+        digitalWrite(DIGITAL_D1, LOW);
+        delayMicroseconds(2);
+        digitalWrite(DIGITAL_D1, HIGH);
+        delayMicroseconds(10);
+        digitalWrite(DIGITAL_D1, LOW);
+        long dur = pulseIn(DIGITAL_D2, HIGH, 16000);
+        if (dur > 0) {
+            float cm = (dur * 0.0343f) / 2.0f;
+            if (cm > 2.0f && cm < 150.0f) return cm;
+        }
+
+        float v = power.readChannelVoltage(ADC_EXT_1);
+        if (v >= 0.40f) return (27.0f / v);
+        return 999.0f;
+    }
+
+    bool isObstacleAhead() {
+        float dist = readFrontDistanceCm();
+        if (dist > 2.5f && dist < 30.0f) return true;
+        if (power.getMotorCurrent() > 2.85f) return true;
+        return false;
+    }
+
     // ── Phase 1: Recording ────────────────────────────────────────────────
     void startRecording(uint32_t now) {
         _rawCount = 0;
@@ -196,9 +228,7 @@ private:
         _lastSampleMs = now;
         _state = STATE_RECORDING;
 
-        // Reset IMU heading zero-reference so record starts at 0 deg
         NRLComms::zeroHeading();
-
         userLed.setBlink(255, 0, 0, 300); // Blinking Red: Recording
     }
 
@@ -217,7 +247,6 @@ private:
             };
             _rawCount++;
         } else {
-            // Buffer full, auto stop
             stopRecording();
             runOptimization();
         }
@@ -233,14 +262,13 @@ private:
     void runOptimization() {
         if (_rawCount == 0) return;
 
-        // Step A: Find leading and trailing dead-time (human hesitation)
         size_t startIdx = 0;
         while (startIdx < _rawCount &&
                fabs(_rawTrajectory[startIdx].forward) < 0.05f &&
                fabs(_rawTrajectory[startIdx].turn) < 0.05f) {
             startIdx++;
         }
-        if (startIdx >= _rawCount) startIdx = 0; // fallback if entirely still
+        if (startIdx >= _rawCount) startIdx = 0;
 
         size_t endIdx = _rawCount - 1;
         while (endIdx > startIdx &&
@@ -249,7 +277,6 @@ private:
             endIdx--;
         }
 
-        // Step B: Time compression with speedupMultiplier
         _optCount = 0;
         uint32_t baseTime = _rawTrajectory[startIdx].timeMs;
 
@@ -258,11 +285,8 @@ private:
 
             TrajectoryPoint p = _rawTrajectory[i];
             uint32_t relativeTime = p.timeMs - baseTime;
-
-            // Compress time
             p.timeMs = (uint32_t)((float)relativeTime / _speedupMultiplier);
 
-            // Boost straightaways where human drove cautiously (up to 20% boost, capped at 1.0)
             if (fabs(p.turn) < 0.15f && fabs(p.forward) > 0.2f) {
                 p.forward = constrain(p.forward * 1.15f, -1.0f, 1.0f);
             }
@@ -274,29 +298,72 @@ private:
         userLed.setSolid(255, 140, 0); // Solid Amber: Optimized & Ready
     }
 
-    // ── Phase 3: Closed-Loop Replay with Gyro Heading Lock ─────────────────
+    // ── Phase 3: Closed-Loop Replay with Collision Avoidance ───────────────
     void startReplay(uint32_t now) {
         if (_optCount == 0) return;
 
         _replayStartMs = now;
+        _lastReplayTickMs = now;
         _replayIdx = 0;
         _state = STATE_REPLAYING;
+        _inEvasiveBypass = false;
+        _obstacleBlockedStartMs = 0;
 
-        // Zero heading at start of playback to align with recorded zero
         NRLComms::zeroHeading();
-
         userLed.setSolid(160, 0, 255); // Purple: Precision Replay
     }
 
     void handleReplayTick(uint32_t now) {
+        uint32_t dt = now - _lastReplayTickMs;
+        _lastReplayTickMs = now;
+
+        // ── Real-Time Obstacle Detection & Dynamic Avoidance ──────────────
+        if (isObstacleAhead()) {
+            drive.stop();
+            userLed.setBlink(255, 120, 0, 150); // Flash Orange: Obstacle in path!
+            _obstacleDetected = true;
+
+            if (_obstacleBlockedStartMs == 0) {
+                _obstacleBlockedStartMs = now;
+            }
+
+            // Freeze the replay timeline so robot doesn't lose its position
+            _replayStartMs += dt;
+
+            // If blocked for more than 1.5 seconds, execute active bypass arc
+            if (now - _obstacleBlockedStartMs > 1500 && !_inEvasiveBypass) {
+                _inEvasiveBypass = true;
+                _bypassStartMs = now;
+            }
+
+            if (_inEvasiveBypass) {
+                uint32_t bypassTime = now - _bypassStartMs;
+                if (bypassTime < 450) {
+                    drive.drive(0.0f, 0.55f); // Steer right around obstacle
+                } else if (bypassTime < 1100) {
+                    drive.drive(0.60f, 0.0f); // Advance past obstacle
+                } else if (bypassTime < 1550) {
+                    drive.drive(0.0f, -0.55f); // Counter-steer back to course
+                } else {
+                    _inEvasiveBypass = false;
+                    _obstacleBlockedStartMs = 0;
+                }
+            }
+            return;
+        } else {
+            _obstacleDetected = false;
+            _obstacleBlockedStartMs = 0;
+            _inEvasiveBypass = false;
+        }
+
         uint32_t elapsed = now - _replayStartMs;
 
-        // Advance to the current keyframe for this point in time
+        // Advance to the current keyframe
         while (_replayIdx + 1 < _optCount && _optTrajectory[_replayIdx + 1].timeMs <= elapsed) {
             _replayIdx++;
         }
 
-        // Finished replaying entire routine
+        // Replay completed
         if (_replayIdx >= _optCount - 1 && elapsed >= _optTrajectory[_optCount - 1].timeMs) {
             abortToIdle();
             return;
@@ -304,39 +371,37 @@ private:
 
         const TrajectoryPoint& target = _optTrajectory[_replayIdx];
 
-        // 1. Closed-Loop Gyro Heading Lock
+        // 1. Gyro Heading Lock
         float currentHeading = NRLComms::getHeading();
         float headingError = target.headingDeg - currentHeading;
-
-        // Normalize heading error into [-180, +180]
         while (headingError > 180.0f)  headingError -= 360.0f;
         while (headingError < -180.0f) headingError += 360.0f;
 
-        // Proportional steering correction added to recorded turn
         float steerCorrection = headingError * _gyroKp;
         float finalTurn = constrain(target.turn + steerCorrection, -1.0f, 1.0f);
 
-        // 2. Dynamic Battery Voltage Compensation
+        // 2. Battery Voltage Normalization
         float vCurrent = power.getBatteryVoltage();
         float vScale = 1.0f;
         if (vCurrent >= 8.0f && vCurrent <= 14.5f) {
-            vScale = _nominalVoltage / vCurrent; // e.g. 12.0 / 11.1 = 1.08x PWM boost
+            vScale = _nominalVoltage / vCurrent;
         }
         float finalForward = constrain(target.forward * vScale, -1.0f, 1.0f);
 
-        // 3. Actuate Motors & Servos
+        // 3. Actuate
         drive.drive(finalForward, finalTurn);
         arm.setPosition(target.armAngle);
         gripper.setPosition(target.gripperAngle);
+        userLed.setSolid(160, 0, 255);
     }
 
     void abortToIdle() {
         drive.stop();
         _state = (_optCount > 0) ? STATE_OPTIMIZED : STATE_MANUAL_IDLE;
         if (_state == STATE_OPTIMIZED) {
-            userLed.setSolid(255, 140, 0); // Amber: Ready to replay again
+            userLed.setSolid(255, 140, 0);
         } else {
-            userLed.setSolid(0, 120, 120); // Cyan: Idle
+            userLed.setSolid(0, 120, 120);
         }
     }
 
@@ -344,15 +409,16 @@ private:
         const char* stateStr = "IDLE";
         if (_state == STATE_RECORDING) stateStr = "REC...";
         else if (_state == STATE_OPTIMIZED) stateStr = "OPTIMIZED";
-        else if (_state == STATE_REPLAYING) stateStr = "REPLAYING";
+        else if (_state == STATE_REPLAYING) {
+            stateStr = _obstacleDetected ? "AVOIDING!" : "REPLAYING";
+        }
 
         telemetry.addData("AI Mode", stateStr);
+        telemetry.addData("Obstacle", _obstacleDetected ? "DETECTED" : "CLEAR");
         telemetry.addData("Speedup", _speedupMultiplier);
-        telemetry.addData("Points", (int)(_state == STATE_REPLAYING ? _optCount : _rawCount));
         telemetry.addData("Heading", NRLComms::getHeading());
         telemetry.addData("Batt(V)", power.getBatteryVoltage());
     }
 };
 
-// Register this OpMode to appear on the handheld Controller menu
 REGISTER_OPMODE(TeachAndRepeatOpMode, "Teach & Repeat AI", TELEOP);
