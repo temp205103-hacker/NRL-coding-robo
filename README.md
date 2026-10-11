@@ -331,14 +331,61 @@ git push origin main
 
 ---
 
+---
+
+## AI Features & Autonomous Systems
+
+This project includes two advanced AI-driven features designed for high precision and competition excellence:
+
+### 1. Teach & Repeat AI (`TeachAndRepeatOpMode.cpp`)
+Registered in the Controller menu as **`Teach & Repeat AI`** (TELEOP).
+
+A demonstration-learning engine that allows a driver to record a routine once and replay it with machine precision and optimized speed.
+
+- **Demonstration Capture:** Records drive sticks, arm elevation, gripper state, and LSM6DSOX gyro heading at 20 Hz (up to 60 seconds).
+- **Trajectory Optimization:** Prunes driver hesitation and dead-time from the start and end, accelerates the timeline (default 1.35x, adjustable up to 2.50x), and boosts straightaway speeds.
+- **Closed-Loop Gyro Heading Lock:** Replays using active proportional steering against recorded target headings to eliminate carpet drift.
+- **Dynamic Voltage Compensation:** Adjusts motor PWM in real time as battery voltage drops to ensure consistent travel distance.
+- **Active Collision Avoidance:** During replay, monitors for obstacles/robots using ultrasonic/IR sensors and motor current. If blocked, halts immediately to prevent fouls (Rule G4.8), freezes the playback timeline without losing state, and executes an evasive bypass if blocked for more than 1.5 seconds!
+
+**Controls:**
+- `X`: Start / Stop recording (auto-optimizes on stop).
+- `Y`: Re-run optimization.
+- `A`: Start autonomous replay / Stop replay early.
+- `LB`: Toggle gripper (Open 20° / Closed 90°).
+- `D-Pad UP / DOWN`: Step arm elevation (+/- 15°).
+- `D-Pad RIGHT / LEFT`: Increase / Decrease speedup multiplier.
+- `LT`: Emergency abort to manual IDLE.
+
+---
+
+### 2. Autonomous AI Driver with Collision Avoidance (`AIDriver*.cpp`)
+Fully autonomous, hands-off self-driving modes tailored specifically to the **NRL 2026 HYPERDRIVE** game arenas:
+
+| Mode on Controller | Source File | Description |
+| :--- | :--- | :--- |
+| **`AI Driver: Red`** | `AIDriverRedField.cpp` | Autonomous driver for Red Squad (starts in Red Start Zone). |
+| **`AI Driver: Blue`** | `AIDriverBlueField.cpp` | Autonomous driver for Blue Squad (starts in Blue Start Zone). |
+| **`AI Driver: Skills`** | `AIDriverSkillsChallenge.cpp` | High-yield autonomous cycle for the solo Autonomous Skill Challenge. |
+
+#### Complete Match Gameplay Cycle
+1. **Spike Mark & High Pole Scoring:** Drives to pre-placed Spike Marks, intakes Core, and stacks onto the High Pole (130 mm height, **+3 pts**).
+2. **Payload Delivery (Rule R9.4):** Retrieves custom team Payload from Source Zone with the independent Cargo Bay mechanism (`SERVO_3`) and scores into Drop Zone (**+10 pts** + reduces Starburst activation threshold from 10 Cores down to 4 Cores).
+3. **Vault Access & Star Map:** Approaches Squad Vault (`SERVO_4`), retrieves Golden Core, and scores onto Star Pole according to the Star Map (**+7 pts** + Star Map Bonus).
+4. **Space Station Auto-Balance (Rule 3.3.3):** Navigates up the Space Station ramp and runs an active closed-loop balance loop reading accelerometer pitch to level the platform within +/- 2.5 degrees for a **15-point BALANCE**!
+5. **Apex Pole Finish (Rule 3.3.4):** Extends arm to the Apex Pole (365 mm) for the final high-value score (**+9 pts**).
+
+#### Real-Time Collision Avoidance & Dynamic Rerouting
+Equipped with multi-modal detection via `ObstacleDetector` in `AIDriverCommon.h`:
+- **Sensors:** Ultrasonic on `DIGITAL_D1`/`D2` (GPIO 35/36), Sharp IR on `ADC_EXT_1`, motor current stall sensing, and IMU deceleration.
+- **Dynamic Rerouting (`smartDriveInches`):**
+  - **Immediate Evasive Brake:** Halts within 30 cm of opposing robots to prevent rule G4.8 penalties.
+  - **Crossing Detection:** Waits 500 ms for crossing robots to clear before resuming.
+  - **Autonomous Bypass:** If permanently blocked, turns out by 35°, drives 14" past the obstacle envelope, counter-turns back to original heading, and finishes the task!
+
+---
+
 ## License
 
 MIT — free to use, modify, and distribute for educational and competition purposes.
----
-## About Teach and repeat feature 
 
-**Teach & Repeat AI** is a TeleOp that lets a driver record a robot routine and replay it autonomously. It’s registered in the Controller menu as **Teach & Repeat AI**.
-
-During recording, it captures drive input, arm and gripper positions, and IMU heading at 20 samples per second, for up to 60 seconds. The recording stays in RAM; it isn’t saved across OpMode restarts. Optimization trims idle time from the start and end, compresses the routine’s timing, and boosts straight driving slightly. During playback, the OpMode uses IMU heading correction and battery-voltage compensation.
-
-**Main controls:** `X` starts and stops recording; stopping also optimizes the routine. `Y` optimizes it again, and `A` starts playback or stops it early. `LT` aborts to manual control. `LB` toggles the gripper, the D-pad adjusts the arm or replay speed, and the sticks drive manually.
