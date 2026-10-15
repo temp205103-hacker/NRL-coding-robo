@@ -1,5 +1,6 @@
 #pragma once
 #include "NRL.h"
+#include "RobotCalibration.h"
 #include <cmath>
 #include <memory>
 
@@ -16,10 +17,10 @@
 // Hardware declarations
 static HexaDCMotor leftMotor  {{ .dirPin = MOTOR_L_DIR, .pwmPin = MOTOR_L_PWM }};
 static HexaDCMotor rightMotor {{ .dirPin = MOTOR_R_DIR, .pwmPin = MOTOR_R_PWM, .flipped = true }};
-static HexaServo   arm        {{ .signalPin = SERVO_1,  .startAngle = 10.0f }};  // Arm elevation
-static HexaServo   gripper    {{ .signalPin = SERVO_2,  .startAngle = 20.0f }};  // Core clamp
-static HexaServo   cargoBay   {{ .signalPin = SERVO_3,  .startAngle = 0.0f  }};  // Payload mechanism (R9.4)
-static HexaServo   vaultGate  {{ .signalPin = SERVO_4,  .startAngle = 0.0f  }};  // Vault intake gate
+static HexaServo   arm        {{ .signalPin = SERVO_1,  .startAngle = ARM_ANGLE_START }};  // Arm elevation
+static HexaServo   gripper    {{ .signalPin = SERVO_2,  .startAngle = GRIPPER_ANGLE_START }};  // Core clamp
+static HexaServo   cargoBay   {{ .signalPin = SERVO_3,  .startAngle = CARGOBAY_ANGLE_START  }};  // Payload mechanism (R9.4)
+static HexaServo   vaultGate  {{ .signalPin = SERVO_4,  .startAngle = VAULT_ANGLE_START  }};  // Vault intake gate
 
 static TankDrive    drive(leftMotor, rightMotor);
 static DriveActions driveActions(drive);
@@ -33,8 +34,8 @@ public:
     uint8_t trigPin = DIGITAL_D1;  // GPIO 35 - Ultrasonic Trigger
     uint8_t echoPin = DIGITAL_D2;  // GPIO 36 - Ultrasonic Echo
     uint8_t irAdcCh = ADC_EXT_1;   // MCP3008 CH3 - Analog Sharp IR sensor
-    float   obstacleThresholdCm = 30.0f; // Detection radius (~12 inches)
-    float   stallCurrentThresholdA = 2.85f; // Current spike indicating physical contact
+    float   obstacleThresholdCm = OBSTACLE_DISTANCE_CM; // Detection radius (~12 inches)
+    float   stallCurrentThresholdA = STALL_CURRENT_A; // Current spike indicating physical contact
 
     void begin() {
         pinMode(trigPin, OUTPUT);
@@ -92,43 +93,43 @@ namespace AIDriver {
 
     // ── Mechanism Action Primitives ───────────────────────────────────────────
     inline ActionPtr openGripper() {
-        return instant([] { gripper.setPosition(20.0f); });
+        return instant([] { gripper.setPosition(GRIPPER_ANGLE_OPEN); });
     }
 
     inline ActionPtr closeGripper() {
-        return instant([] { gripper.setPosition(95.0f); });
+        return instant([] { gripper.setPosition(GRIPPER_ANGLE_CLOSE); });
     }
 
     inline ActionPtr armFloor() {
-        return instant([] { arm.setPosition(10.0f); });
+        return instant([] { arm.setPosition(ARM_ANGLE_FLOOR); });
     }
 
     inline ActionPtr armCarry() {
-        return instant([] { arm.setPosition(35.0f); });
+        return instant([] { arm.setPosition(ARM_ANGLE_CARRY); });
     }
 
     inline ActionPtr armHighPole() {
-        return instant([] { arm.setPosition(90.0f); });
+        return instant([] { arm.setPosition(ARM_ANGLE_HIGH_POLE); });
     }
 
     inline ActionPtr armApexPole() {
-        return instant([] { arm.setPosition(160.0f); });
+        return instant([] { arm.setPosition(ARM_ANGLE_APEX_POLE); });
     }
 
     inline ActionPtr deployPayload() {
         return sequential({
-            instant([] { cargoBay.setPosition(90.0f); }),
-            sleep_ms(600),
-            instant([] { cargoBay.setPosition(0.0f);  })
+            instant([] { cargoBay.setPosition(CARGOBAY_ANGLE_OPEN); }),
+            sleep_ms(CARGOBAY_DEPLOY_HOLD_MS),
+            instant([] { cargoBay.setPosition(CARGOBAY_ANGLE_CLOSED);  })
         });
     }
 
     inline ActionPtr openVaultGate() {
-        return instant([] { vaultGate.setPosition(90.0f); });
+        return instant([] { vaultGate.setPosition(VAULT_ANGLE_OPEN); });
     }
 
     inline ActionPtr closeVaultGate() {
-        return instant([] { vaultGate.setPosition(0.0f); });
+        return instant([] { vaultGate.setPosition(VAULT_ANGLE_CLOSED); });
     }
 
     // ── Smart Self-Rerouting Drive Action (Obstacle Avoidance) ─────────────────
@@ -143,7 +144,7 @@ namespace AIDriver {
     private:
         float _targetInches;
         float _evadeAngle;
-        float _msPerInch = 18.0f; // Approx timing calibration at 0.75 drive power
+        float _msPerInch = MS_PER_INCH; // ms per inch (calibrated in RobotCalibration.h)
         float _coveredInches = 0.0f;
 
         enum Stage {
@@ -194,9 +195,9 @@ namespace AIDriver {
                     float headingErr = _baseHeading - currentHeading;
                     while (headingErr > 180.0f)  headingErr -= 360.0f;
                     while (headingErr < -180.0f) headingErr += 360.0f;
-                    float turnCorrection = constrain(headingErr * 0.025f, -0.4f, 0.4f);
+                    float turnCorrection = constrain(headingErr * GYRO_KP_DRIVE, -0.4f, 0.4f);
 
-                    float forwardDir = (_targetInches >= 0.0f) ? 0.75f : -0.75f;
+                    float forwardDir = (_targetInches >= 0.0f) ? DRIVE_POWER : -DRIVE_POWER;
                     drive.drive(forwardDir, turnCorrection);
 
                     _coveredInches += (float)dt / _msPerInch;
@@ -301,7 +302,7 @@ namespace AIDriver {
         bool     _started = false;
 
     public:
-        explicit AutoBalanceAction(uint32_t durationMs = 6000)
+        explicit AutoBalanceAction(uint32_t durationMs = BALANCE_TIMEOUT_MS)
             : _durationMs(durationMs) {}
 
         bool run() override {
@@ -325,10 +326,10 @@ namespace AIDriver {
                 float az = imu.getAccelZ();
                 float pitchDeg = atan2(-ax, sqrt(ay * ay + az * az)) * (180.0f / 3.14159f);
 
-                if (pitchDeg > 2.5f) {
-                    drive.drive(0.22f, 0.0f);  // creep forward
-                } else if (pitchDeg < -2.5f) {
-                    drive.drive(-0.22f, 0.0f); // creep backward
+                if (pitchDeg > BALANCE_PITCH_TOLERANCE_DEG) {
+                    drive.drive(BALANCE_CREEP_POWER, 0.0f);  // creep forward
+                } else if (pitchDeg < -BALANCE_PITCH_TOLERANCE_DEG) {
+                    drive.drive(-BALANCE_CREEP_POWER, 0.0f); // creep backward
                 } else {
                     drive.stop();             // level, hold position
                 }
@@ -341,7 +342,7 @@ namespace AIDriver {
         }
     };
 
-    inline ActionPtr autoBalanceSpaceStation(uint32_t durationMs = 6000) {
+    inline ActionPtr autoBalanceSpaceStation(uint32_t durationMs = BALANCE_TIMEOUT_MS) {
         return std::make_shared<AutoBalanceAction>(durationMs);
     }
 
