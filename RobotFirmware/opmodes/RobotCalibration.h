@@ -25,13 +25,14 @@
 //
 //  HOW TO MEASURE:
 //    1. Run "Calibration Tool" opmode and press BTN_X (Odometry Test).
-//    2. Robot drives forward for exactly 3 seconds at DRIVE_POWER.
+//    2. Robot drives forward for exactly 5 seconds at DRIVE_POWER.
 //    3. Measure the actual distance traveled in inches with a tape measure.
-//    4. New value = 3000ms / measured_inches
-//    Example: Robot traveled 20 inches → MS_PER_INCH = 3000 / 20 = 150.0
+//    4. New value = ODOMETRY_TEST_DURATION_MS / measured_inches
+//    Example: Robot traveled 20 inches → MS_PER_INCH = 5000 / 20 = 250.0
 //
 //  CURRENT VALUE: 18.0f (estimated default — MUST be measured on real robot)
 constexpr float MS_PER_INCH = 18.0f;
+constexpr uint32_t ODOMETRY_TEST_DURATION_MS = 5000;
 
 //  DRIVE_POWER — Forward drive power (0.0 = stopped, 1.0 = full speed).
 //  Used by SmartDriveAction for all AI autonomous driving.

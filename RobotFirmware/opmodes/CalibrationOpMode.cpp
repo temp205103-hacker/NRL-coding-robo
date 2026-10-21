@@ -59,7 +59,7 @@ private:
     // Odometry test state
     bool     _odoRunning    = false;
     uint32_t _odoStartMs    = 0;
-    uint32_t _odoDurationMs = 3000; // drive for 3 seconds, measure distance
+    uint32_t _odoDurationMs = ODOMETRY_TEST_DURATION_MS;
 
     // Track last button state to avoid repeat triggers
     uint32_t _lastAngleChangeMs = 0;
@@ -144,9 +144,9 @@ private:
     // ── TEST A: Odometry — measures MS_PER_INCH ───────────────────────────────
     void handleOdometry(uint32_t now) {
         telemetry.addData("=== ODOMETRY TEST ===", "");
-        telemetry.addData("BTN_X", "Start 3-sec drive");
+        telemetry.addData("BTN_X", "Start 5-sec drive");
         telemetry.addData("", "Measure inches driven");
-        telemetry.addData("Formula", "3000 / inches = MS_PER_INCH");
+        telemetry.addData("Formula", "5000 / inches = MS_PER_INCH");
         telemetry.addData("Current MS_PER_INCH", MS_PER_INCH);
         telemetry.addData("Drive Power", DRIVE_POWER);
 
@@ -171,7 +171,7 @@ private:
                 _odoRunning = false;
                 userLed.setSolid(0, 255, 0); // Green: done
                 telemetry.addData("Status", "DONE — measure distance!");
-                telemetry.addData("Formula", "3000 / inches_traveled");
+                telemetry.addData("Formula", "5000 / inches_traveled");
                 telemetry.addData("Result goes in", "RobotCalibration.h");
                 telemetry.addData("  MS_PER_INCH =", " ???");
             }
