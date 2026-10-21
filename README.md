@@ -282,6 +282,25 @@ button**.
 
 ---
 
+## Hardware Diagnostics OpMode
+
+The **`HW Diagnostics`** TELEOP mode is available from the Controller menu for bench and pit checks:
+
+| Control | Test |
+|---------|------|
+| `X` | Run the left motor forward for 1 second, then reverse for 1 second. |
+| `A` | Run the right motor forward for 1 second, then reverse for 1 second. |
+| D-pad `LEFT` / `RIGHT` | Select the active servo: arm, gripper, Cargo Bay, or Vault gate. |
+| Hold D-pad `UP` / `DOWN` | Sweep the selected servo between its configured limits and back. |
+| `Y` | Play three short buzzer beeps. |
+| `LB` | Cycle the user LED through red, green, blue, and off. |
+
+The robot OLED displays ultrasonic distance, external ADC voltage, battery voltage, motor and servo rail current, and IMU pitch, roll, and heading. The same readings and current test status are also sent as Controller telemetry.
+
+The BaseBot construction guide shows four drive motors arranged as left/right sides, while this firmware exposes two production motor channels. The motor tests address those two channels; front and rear motors on each side must be wired to the corresponding channel to test them together. The guide includes the arm and gripper servos. Cargo Bay and Vault gate servos are optional team-built mechanisms, not part of the documented BaseBot assembly. Servo sweeps are limited to the configured RobotCalibration target ranges rather than the servos' full electrical travel. Confirm all moving parts are clear before running tests; ultrasonic and IR readings require those optional sensors to be installed.
+
+---
+
 ## Library Overview
 
 | Library | Purpose |
@@ -388,4 +407,3 @@ Equipped with multi-modal detection via `ObstacleDetector` in `AIDriverCommon.h`
 ## License
 
 MIT — free to use, modify, and distribute for educational and competition purposes.
-
