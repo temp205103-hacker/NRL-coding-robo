@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" role="img" aria-labelledby="title desc">
+  <title id="title">Hexa controller control map</title>
+  <desc id="desc">Logical control map for the robot sticks, D-pad, face buttons, bumpers, and toggles. The drawing is schematic, not an exact product photograph.</desc>
+  <rect width="900" height="420" rx="28" fill="#101820"/>
+  <text x="450" y="38" fill="#fff" font-family="Arial,sans-serif" font-size="25" font-weight="700" text-anchor="middle">HEXA CONTROLLER — CONTROL MAP</text>
+  <rect x="28" y="62" width="844" height="330" rx="42" fill="#273746" stroke="#718096" stroke-width="4"/>
+  <rect x="338" y="83" width="224" height="95" rx="10" fill="#102a43" stroke="#75c9f5" stroke-width="3"/>
+  <text x="450" y="122" fill="#b9e6ff" font-family="Arial,sans-serif" font-size="18" text-anchor="middle">CONTROLLER DISPLAY</text>
+  <text x="450" y="150" fill="#fff" font-family="Arial,sans-serif" font-size="14" text-anchor="middle">Menus • OpMode • Telemetry</text>
+  <circle cx="221" cy="286" r="48" fill="#16232e" stroke="#9fb3c8" stroke-width="4"/>
+  <circle cx="221" cy="286" r="19" fill="#607d8b"/>
+  <path d="M221 224v-19M221 348v19M159 286h-19M283 286h19" stroke="#d7e3ed" stroke-width="4"/>
+  <text x="221" y="360" fill="#fff" font-family="Arial,sans-serif" font-size="16" text-anchor="middle">LEFT STICK — DRIVE</text>
+  <text x="221" y="382" fill="#cbd5e0" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">Up/down = forward/reverse</text>
+  <circle cx="678" cy="286" r="48" fill="#16232e" stroke="#9fb3c8" stroke-width="4"/>
+  <circle cx="678" cy="286" r="19" fill="#607d8b"/>
+  <path d="M678 224v-19M678 348v19M616 286h-19M740 286h19" stroke="#d7e3ed" stroke-width="4"/>
+  <text x="678" y="360" fill="#fff" font-family="Arial,sans-serif" font-size="16" text-anchor="middle">RIGHT STICK — TURN</text>
+  <text x="678" y="382" fill="#cbd5e0" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">Left/right = rotate</text>
+  <path d="M351 261h28v-28h22v28h28v22h-28v28h-22v-28h-28z" fill="#34495e" stroke="#dce6ee" stroke-width="2"/>
+  <text x="390" y="331" fill="#fff" font-family="Arial,sans-serif" font-size="14" text-anchor="middle">D-PAD</text>
+  <circle cx="510" cy="241" r="17" fill="#d35454"/><text x="510" y="247" fill="#fff" font-family="Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">X</text>
+  <circle cx="548" cy="274" r="17" fill="#58a66a"/><text x="548" y="280" fill="#fff" font-family="Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">A</text>
+  <circle cx="510" cy="307" r="17" fill="#d4aa3d"/><text x="510" y="313" fill="#fff" font-family="Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Y</text>
+  <text x="531" y="338" fill="#cbd5e0" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">X / A / Y • no B button</text>
+  <rect x="84" y="72" width="106" height="29" rx="10" fill="#4a6378"/><text x="137" y="92" fill="#fff" font-family="Arial,sans-serif" font-size="14" text-anchor="middle">LB • left bumper</text>
+  <rect x="710" y="72" width="106" height="29" rx="10" fill="#4a6378"/><text x="763" y="92" fill="#fff" font-family="Arial,sans-serif" font-size="14" text-anchor="middle">RB • right bumper</text>
+  <rect x="84" y="110" width="106" height="25" rx="9" fill="#52616b"/><text x="137" y="128" fill="#fff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">LT • left toggle</text>
+  <rect x="710" y="110" width="106" height="25" rx="9" fill="#52616b"/><text x="763" y="128" fill="#fff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">RT • right toggle</text>
+</svg>

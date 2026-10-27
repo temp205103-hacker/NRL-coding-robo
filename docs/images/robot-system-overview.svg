@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-labelledby="title desc">
+  <title id="title">NRL robot system overview</title>
+  <desc id="desc">Schematic showing handheld controller wireless connection to the robot hub, drive motor channels, servos, sensors, power monitor, and robot OLED.</desc>
+  <rect width="900" height="500" rx="24" fill="#f3f6f8"/>
+  <text x="450" y="42" fill="#172b3a" font-family="Arial,sans-serif" font-size="25" font-weight="700" text-anchor="middle">ROBOT + CONTROLLER SYSTEM (SCHEMATIC)</text>
+  <rect x="40" y="190" width="190" height="130" rx="20" fill="#2c3e50"/>
+  <rect x="78" y="210" width="114" height="58" rx="8" fill="#14324a" stroke="#61c5f0" stroke-width="3"/>
+  <text x="135" y="235" fill="#fff" font-family="Arial,sans-serif" font-size="15" text-anchor="middle">CONTROLLER</text>
+  <text x="135" y="255" fill="#cdeeff" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">sticks + buttons + screen</text>
+  <text x="135" y="295" fill="#fff" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">ESP-NOW radio</text>
+  <path d="M240 253h122" stroke="#168aad" stroke-width="5" stroke-dasharray="10 8"/>
+  <path d="M348 241l20 12-20 12" fill="none" stroke="#168aad" stroke-width="5"/>
+  <text x="300" y="235" fill="#126782" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">wireless</text>
+  <rect x="370" y="150" width="210" height="205" rx="18" fill="#1e6b50"/>
+  <text x="475" y="185" fill="#fff" font-family="Arial,sans-serif" font-size="18" font-weight="700" text-anchor="middle">ROBOT HUB</text>
+  <text x="475" y="215" fill="#eafff3" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">ESP32-S3 + NRL firmware</text>
+  <text x="475" y="241" fill="#eafff3" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">OpModes • motor/servo control</text>
+  <text x="475" y="267" fill="#eafff3" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">telemetry • safety • calibration</text>
+  <rect x="417" y="290" width="116" height="42" rx="6" fill="#173f33" stroke="#bcebd2" stroke-width="2"/>
+  <text x="475" y="316" fill="#fff" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">OLED status</text>
+  <path d="M580 210h72M580 270h72M475 355v64" stroke="#64748b" stroke-width="3"/>
+  <rect x="655" y="145" width="205" height="105" rx="14" fill="#e5edf3" stroke="#587187" stroke-width="2"/>
+  <text x="757" y="175" fill="#203647" font-family="Arial,sans-serif" font-size="16" font-weight="700" text-anchor="middle">DRIVE</text>
+  <text x="757" y="201" fill="#203647" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">Left + right motor channels</text>
+  <text x="757" y="225" fill="#203647" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">front/rear motors paired per side</text>
+  <rect x="655" y="270" width="205" height="105" rx="14" fill="#e5edf3" stroke="#587187" stroke-width="2"/>
+  <text x="757" y="300" fill="#203647" font-family="Arial,sans-serif" font-size="16" font-weight="700" text-anchor="middle">MECHANISMS</text>
+  <text x="757" y="326" fill="#203647" font-family="Arial,sans-serif" font-size="13" text-anchor="middle">SERVO 1 arm • SERVO 2 gripper</text>
+  <text x="757" y="350" fill="#203647" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">SERVO 3/4 optional team mechanisms</text>
+  <rect x="375" y="420" width="200" height="58" rx="12" fill="#fff0d6" stroke="#d59b37" stroke-width="2"/>
+  <text x="475" y="445" fill="#5c4216" font-family="Arial,sans-serif" font-size="14" font-weight="700" text-anchor="middle">SENSING + POWER</text>
+  <text x="475" y="465" fill="#5c4216" font-family="Arial,sans-serif" font-size="12" text-anchor="middle">IMU • ADC/current • optional distance sensors</text>
+</svg>

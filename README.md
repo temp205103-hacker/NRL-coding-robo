@@ -188,6 +188,49 @@ The controller ships as a **prebuilt binary** — there is nothing to compile.
 
 Both devices communicate wirelessly via **ESP-NOW** — no WiFi router needed.
 
+## Using the Hexa Controller with This Robot
+
+![Schematic map of the Hexa controller sticks, D-pad, buttons, bumpers, and toggles](docs/images/hexa-controller-controls.svg)
+
+![Schematic overview of the controller, robot hub, drive, mechanisms, and sensors](docs/images/robot-system-overview.svg)
+
+These are original **logical schematics**, not product photos or exact-to-scale hardware
+drawings. Button labels and robot connections reflect this project's firmware. For additional
+NRL program and robot resources, see the [NRL Youth Dashboard](https://nrlportal.theinnovationstory.com/#/youth-dashboard).
+
+### Connect and start a mode
+
+1. Power on the robot and controller. On the controller, set **WiFi Channel** to the same
+   channel configured in `RobotFirmware/platformio.ini`; both devices must use the same
+   channel to communicate.
+2. Use the controller's on-screen OpMode menu to select a mode. Follow the screen's prompts
+   to initialize and start it. **TELEOP** modes respond to your controls; **AUTO** modes run
+   their programmed route after start.
+3. Use the controller's on-screen stop/exit control to end a run. Keep the robot restrained
+   or wheels raised during first tests. Check that the selected OpMode and robot are ready
+   before starting any autonomous routine.
+
+The controller provides two analog sticks, a D-pad, `X`, `A`, `Y`, left/right bumpers
+(`LB`/`RB`), and left/right toggles (`LT`/`RT`). This controller has **no B button**.
+During an OpMode, `Y` is available to the running program; in menus it may act as Back.
+Telemetry appears on the controller display, and supported OpModes also show status on the
+robot OLED.
+
+### Controls by OpMode
+
+| Controller mode | How to operate it |
+|---|---|
+| **Driver TeleOp** | Left stick up/down drives forward/reverse; right stick left/right turns. Hold `LB` for 35% precision speed. Press `X` to close the gripper, then raise the arm to carry. D-pad `UP` selects High Pole and `DOWN` selects floor; `RB` selects Apex Pole. `A` toggles the gripper, `Y` toggles the optional Cargo Bay, and `RT` toggles the optional Vault gate. Watch battery/current and mechanism telemetry. |
+| **HW Diagnostics** | Press `X` to test the left drive channel and `A` for the right. D-pad `LEFT`/`RIGHT` selects a servo; hold `UP`/`DOWN` to sweep it. `Y` tests the buzzer and `LB` cycles the LED. Check OLED/controller sensor readings. Keep clear of moving parts; optional sensors and mechanisms show readings or operate only if installed. |
+| **Calibration Tool** | From its menu: `X` starts the 5-second odometry test, `A` selects arm sweep, `Y` gripper, `RB` Cargo Bay, `LB` Vault gate, and `RT` balance/IMU test. During servo tests, D-pad `UP`/`DOWN` changes by 5 degrees and `RIGHT`/`LEFT` fine-tunes by 1 degree. `LT` returns to the calibration menu. Measure physical travel and update `RobotCalibration.h` on the computer; then rebuild and upload. |
+| **Star Map Setup** | Before an AI match, run this TELEOP mode. D-pad `UP`/`DOWN` selects `GOLD-SQUAD-GOLD`, `SQUAD-GOLD-GOLD`, or `GOLD-GOLD-SQUAD`; press `A` to confirm. Stop setup, then choose the Red or Blue AI mode. The selection is held in RAM and resets when firmware restarts. |
+| **Teach & Repeat AI** | Sticks drive manually. `X` starts and stops route recording (stopping optimizes it); `Y` optimizes again; `A` starts replay or aborts replay. `LB` toggles the gripper; D-pad `UP`/`DOWN` adjusts the arm; D-pad `RIGHT`/`LEFT` changes replay speed. Hold `RB+Y` for 1.2 seconds to save the optimized route; hold `RB+LT` for 1.2 seconds to erase the saved and in-memory route. Use telemetry/OLED flash status to confirm. |
+| **AI Driver: Red / Blue / Skills** | These are autonomous modes, not stick-driving modes. Select the appropriate arena/skills routine and start only when the robot is in its prescribed start position and the field is clear. The routine controls drive and mechanisms. Obstacle detection/avoidance depends on the corresponding sensors being installed and correctly wired. |
+
+`LT`/`RT` refer to the controller's toggle inputs (not the analog triggers found on some
+gamepads). Controls are defined by each OpMode; a button may serve a different purpose in a
+different mode. Check that mode's row above before pressing it.
+
 ---
 
 ## Troubleshooting
