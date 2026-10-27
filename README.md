@@ -146,9 +146,33 @@ must share that field's channel instead; set it with `py -3 tools/set-competitio
 ## Flashing the Firmware
 
 ### Robot (Bot)
-1. Open the `RobotFirmware` folder in VSCode
-2. Connect the Robot ESP32-S3 via USB
-3. Click **Upload** in PlatformIO (or `Ctrl+Alt+U`)
+1. Install VS Code with the **PlatformIO IDE** extension, then open the
+   `RobotFirmware` folder.
+2. Connect the robot's ESP32-S3 to the computer with a USB **data** cable. For first
+   tests, lift the wheels clear of the floor or disconnect the drive motors.
+3. In PlatformIO, select the `robot` environment and click **Build**. Fix any reported
+   compile errors before continuing.
+4. Click **Upload** (or press `Ctrl+Alt+U`) and select the robot's COM/serial port if
+   prompted. PlatformIO builds the firmware and uploads it to the robot; you do not copy
+   source files onto the robot.
+5. This project uses an expanded NVS partition for Teach & Repeat saved routes. When
+   installing this layout for the first time over older firmware, erase the robot's flash
+   once, then upload again so the new partition table is applied. In the PlatformIO
+   terminal, run `pio run -t erase` from `RobotFirmware`, then click **Upload**. Erasing
+   deletes stored routes and other flash settings.
+6. Restart and run **HW Diagnostics** first. Then use **Calibration Tool** to measure
+   the real robot before driving it or relying on autonomous routes.
+
+#### Updating code after it has been uploaded
+The robot runs a compiled firmware image; editing files on your computer does not change
+the program already on the robot. To make a change, edit the source in
+`RobotFirmware/opmodes/` (or the relevant configuration/library file), save it, then
+**Build** and **Upload** again using the same steps above. The upload replaces the
+firmware on the connected robot. Keep the project files under version control or make a
+backup so you can restore earlier code. You normally do not need to erase flash for
+ordinary code edits; erase only when you need to reset flash or apply a changed partition
+layout. After each update, test safely and rerun calibration if you changed drive,
+mechanism, sensor, or route behavior.
 
 ### Controller (Handheld)
 The controller ships as a **prebuilt binary** — there is nothing to compile.
