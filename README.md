@@ -299,6 +299,23 @@ The robot OLED displays ultrasonic distance, external ADC voltage, battery volta
 
 The BaseBot construction guide shows four drive motors arranged as left/right sides, while this firmware exposes two production motor channels. The motor tests address those two channels; front and rear motors on each side must be wired to the corresponding channel to test them together. The guide includes the arm and gripper servos. Cargo Bay and Vault gate servos are optional team-built mechanisms, not part of the documented BaseBot assembly. Servo sweeps are limited to the configured RobotCalibration target ranges rather than the servos' full electrical travel. Confirm all moving parts are clear before running tests; ultrasonic and IR readings require those optional sensors to be installed.
 
+## Driver TeleOp and Star Map Setup
+
+The **`Driver TeleOp`** mode provides tank drive (left stick Y / right stick X), hold `LB` for
+35% precision speed, `X` to close the gripper and lift to carry, D-pad up/down for High Pole/floor,
+`RB` for Apex Pole, `A` to toggle the gripper, `Y` to toggle the Cargo Bay, and `RT` to toggle
+the Vault gate. Its telemetry includes battery voltage with a warning below 11 V, motor current,
+arm angle, gripper state, and speed mode. Cargo Bay and Vault controls require those optional
+mechanisms to be installed.
+
+To select an autonomous Star Map, run **`Star Map Setup`** as TELEOP, use D-pad up/down to select
+one of the three patterns, and press `A` to confirm. Stop that mode and then select **`AI Driver:
+Red`** or **`AI Driver: Blue`**; the selected pattern is shared with both autonomous modes until
+the firmware restarts. The SDK has no repeated pre-start/init hook, so selection cannot be
+confirmed before INIT as requested in the task; the setup mode is a separate, explicit step
+before starting AUTO. The autonomous pattern routines use the existing route distances as initial
+field assumptions; rehearse and tune them on the robot before competition.
+
 ---
 
 ## Library Overview
@@ -375,6 +392,11 @@ A demonstration-learning engine that allows a driver to record a routine once an
 - `D-Pad UP / DOWN`: Step arm elevation (+/- 15°).
 - `D-Pad RIGHT / LEFT`: Increase / Decrease speedup multiplier.
 - `LT`: Emergency abort to manual IDLE.
+- Hold `RB + Y` for 1.2 seconds: Save the optimized route to flash.
+- Hold `RB + LT` for 1.2 seconds: Clear the saved route and in-memory route.
+
+Teach & Repeat loads a validated saved trajectory during INIT. The OLED reports `SAVED TO FLASH`,
+`LOADED FROM FLASH`, or `NO SAVED ROUTE`; Controller telemetry shows the flash state as well.
 
 ---
 

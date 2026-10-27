@@ -26,8 +26,7 @@ public:
     }
 
     void start() override {
-        // Queue the entire autonomous match plan with smart obstacle rerouting
-        runAction(sequential({
+        std::vector<ActionPtr> matchPlan = {
             // ── Phase 0: Gyro Stabilization ───────────────────────────────
             driveActions.waitForHeadingReady(),
             instant([] { userLed.setBlink(0, 0, 255, 300); }),
@@ -58,23 +57,14 @@ public:
             driveActions.turn(-180),               // Rotate toward Blue Drop Zone
             AIDriver::smartDriveInches(44, -35.0f),// Traverse to Drop Zone with avoidance
             AIDriver::deployPayload(),              // Release Payload (+10 pts, unlocks Starburst!)
-            sleep_ms(300),
+            sleep_ms(300)
+        };
 
-            // ── Phase 4: Vault & Star Pole Golden Core ────────────────────
-            AIDriver::smartDriveInches(-14, 30.0f),
-            driveActions.turn(90),                 // Face Blue Vault
-            AIDriver::smartDriveInches(22, -30.0f),// Reach Vault opening safely
-            AIDriver::openVaultGate(),
-            sleep_ms(400),
-            AIDriver::closeVaultGate(),
-            driveActions.turn(-45),                // Turn toward Blue Star Pole
-            AIDriver::smartDriveInches(26, -35.0f),// Drive to Star Pole
-            AIDriver::armHighPole(),               // Align over Star Pole
-            AIDriver::openGripper(),               // Score Golden Core (+7 pts)
-            AIDriver::armCarry(),
+        matchPlan.push_back(AIDriver::starMapScoringActions(90.0f));
 
+        const std::vector<ActionPtr> endgamePlan = {
             // ── Phase 5: Level Up End Game — Space Station & Apex Pole ────
-            driveActions.turn(-45),                // Turn toward Blue Space Station ramp
+            driveActions.turn(-45),                 // Turn toward Blue Space Station ramp
             AIDriver::smartDriveInches(32, -30.0f),// Climb onto Space Station tilting deck
             AIDriver::autoBalanceSpaceStation(5500), // Active IMU leveling for 15-pt Balance!
             AIDriver::armApexPole(),               // Elevate to Apex Pole (365mm)
@@ -84,7 +74,9 @@ public:
             AIDriver::armCarry(),
             driveActions.stopAll(),                // Lock brakes for match finish
             instant([] { userLed.setSolid(0, 255, 0); }) // Green: Routine Complete!
-        }));
+        };
+        matchPlan.insert(matchPlan.end(), endgamePlan.begin(), endgamePlan.end());
+        runAction(sequential(matchPlan));
     }
 
     void loop() override {
@@ -92,6 +84,7 @@ public:
         telemetry.addData("Arena", "BLUE SQUAD");
         telemetry.addData("Driver", "SELF-DRIVING AI");
         telemetry.addData("Obstacle", obstacleDetector.isObstacleAhead() ? "AVOIDING" : "CLEAR");
+        telemetry.addData("StarMap", starMapPatternName(starMapPattern));
         telemetry.addData("Dist(cm)", obstacleDetector.getFrontDistanceCm());
         telemetry.addData("Heading", NRLComms::getHeading());
         telemetry.addData("Batt(V)", power.getBatteryVoltage());

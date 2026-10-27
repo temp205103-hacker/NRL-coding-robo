@@ -1,4 +1,7 @@
 #include "NRL.h"
+#include <Preferences.h>
+#include <cmath>
+#include <cstring>
 
 // ============================================================================
 //  Teach & Repeat AI OpMode (With Active Obstacle Avoidance & Rerouting)
@@ -46,8 +49,11 @@ struct TrajectoryPoint {
     uint32_t timeMs;        // millisecond timestamp relative to routine start
 };
 
+static_assert(sizeof(TrajectoryPoint) == 24, "NVS trajectory format must remain 24 bytes per point");
+
 static constexpr size_t MAX_POINTS = 1200;
 static constexpr uint32_t SAMPLE_INTERVAL_MS = 50; // 20 Hz capture rate
+static constexpr uint32_t STORAGE_COMBO_HOLD_MS = 1200;
 
 class TeachAndRepeatOpMode : public NRLOpMode {
 private:
@@ -87,6 +93,16 @@ private:
     bool     _inEvasiveBypass = false;
     uint32_t _bypassStartMs = 0;
 
+    const char* _flashStatus = "NO SAVED ROUTE";
+    bool _oledAvailable = false;
+    uint32_t _lastOledRefreshMs = 0;
+    bool _saveComboTiming = false;
+    bool _clearComboTiming = false;
+    bool _saveComboTriggered = false;
+    bool _clearComboTriggered = false;
+    uint32_t _saveComboStartMs = 0;
+    uint32_t _clearComboStartMs = 0;
+
 public:
     void init() override {
         arm.begin();
@@ -102,12 +118,22 @@ public:
         _rawCount = 0;
         _optCount = 0;
         _inEvasiveBypass = false;
+        _oledAvailable = botOled.isReady();
+        _lastOledRefreshMs = 0;
+        loadSavedRoute();
 
-        userLed.setSolid(0, 120, 120); // Cyan: Idle Ready
+        userLed.setSolid(_optCount > 0 ? 255 : 0,
+                         _optCount > 0 ? 140 : 120,
+                         _optCount > 0 ? 0 : 120);
     }
 
     void loop() override {
         uint32_t now = millis();
+
+        if (handleStorageCombos(now)) {
+            sendTelemetryStatus();
+            return;
+        }
 
         // ── Emergency Abort ───────────────────────────────────────────────
         if (gamepad1.justPressed(BTN_LT)) {
@@ -195,6 +221,142 @@ private:
         drive.drive(gamepad1.leftY(), gamepad1.rightX());
     }
 
+    bool handleStorageCombos(uint32_t now) {
+        const bool saveHeld = gamepad1.pressed(BTN_RB) && gamepad1.pressed(BTN_Y);
+        const bool clearHeld = gamepad1.pressed(BTN_RB) && gamepad1.pressed(BTN_LT);
+
+        if (!saveHeld) {
+            _saveComboTiming = false;
+            _saveComboTriggered = false;
+        }
+        if (!clearHeld) {
+            _clearComboTiming = false;
+            _clearComboTriggered = false;
+        }
+        if (!saveHeld && !clearHeld) return false;
+
+        drive.stop();
+
+        if (clearHeld) {
+            if (!_clearComboTiming) {
+                _clearComboTiming = true;
+                _clearComboStartMs = now;
+            } else if (!_clearComboTriggered &&
+                       now - _clearComboStartMs >= STORAGE_COMBO_HOLD_MS) {
+                _clearComboTriggered = true;
+                clearSavedRoute();
+            }
+        } else {
+            if (!_saveComboTiming) {
+                _saveComboTiming = true;
+                _saveComboStartMs = now;
+            } else if (!_saveComboTriggered &&
+                       now - _saveComboStartMs >= STORAGE_COMBO_HOLD_MS) {
+                _saveComboTriggered = true;
+                saveOptimizedRoute();
+            }
+        }
+
+        return true;
+    }
+
+    void loadSavedRoute() {
+        _rawCount = 0;
+        _optCount = 0;
+        _state = STATE_MANUAL_IDLE;
+
+        Preferences preferences;
+        if (!preferences.begin("teach_repeat", true)) {
+            _flashStatus = "NO SAVED ROUTE";
+            return;
+        }
+
+        const uint32_t count = preferences.getUInt("opt_count", 0);
+        const size_t byteLength = preferences.getBytesLength("opt_traj");
+        if (count == 0) {
+            preferences.end();
+            _flashStatus = "NO SAVED ROUTE";
+            return;
+        }
+        if (count > MAX_POINTS || byteLength != count * sizeof(TrajectoryPoint)) {
+            preferences.end();
+            _flashStatus = "INVALID ROUTE";
+            return;
+        }
+
+        const size_t bytesRead = preferences.getBytes(
+            "opt_traj", _optTrajectory, byteLength);
+        preferences.end();
+        if (bytesRead != byteLength) {
+            _flashStatus = "INVALID ROUTE";
+            return;
+        }
+
+        for (size_t i = 0; i < count; ++i) {
+            const TrajectoryPoint& point = _optTrajectory[i];
+            if (!std::isfinite(point.forward) || point.forward < -1.0f || point.forward > 1.0f ||
+                !std::isfinite(point.turn) || point.turn < -1.0f || point.turn > 1.0f ||
+                !std::isfinite(point.armAngle) || point.armAngle < 0.0f || point.armAngle > 180.0f ||
+                !std::isfinite(point.gripperAngle) ||
+                point.gripperAngle < 0.0f || point.gripperAngle > 180.0f ||
+                !std::isfinite(point.headingDeg) ||
+                (i > 0 && point.timeMs < _optTrajectory[i - 1].timeMs)) {
+                _flashStatus = "INVALID ROUTE";
+                return;
+            }
+        }
+
+        _optCount = count;
+        _state = STATE_OPTIMIZED;
+        _flashStatus = "LOADED FROM FLASH";
+    }
+
+    void saveOptimizedRoute() {
+        if (_optCount == 0 || _optCount > MAX_POINTS) {
+            _flashStatus = "NO OPT ROUTE";
+            return;
+        }
+
+        Preferences preferences;
+        if (!preferences.begin("teach_repeat", false)) {
+            _flashStatus = "SAVE FAILED";
+            return;
+        }
+
+        const size_t byteLength = _optCount * sizeof(TrajectoryPoint);
+        const size_t bytesWritten = preferences.putBytes(
+            "opt_traj", _optTrajectory, byteLength);
+        const size_t countWritten = bytesWritten == byteLength
+            ? preferences.putUInt("opt_count", static_cast<uint32_t>(_optCount))
+            : 0;
+        preferences.end();
+
+        _flashStatus = (bytesWritten == byteLength && countWritten == sizeof(uint32_t))
+            ? "SAVED TO FLASH"
+            : "SAVE FAILED";
+    }
+
+    void clearSavedRoute() {
+        Preferences preferences;
+        if (!preferences.begin("teach_repeat", false)) {
+            _flashStatus = "CLEAR FAILED";
+            return;
+        }
+        const bool cleared = preferences.clear();
+        preferences.end();
+        if (!cleared) {
+            _flashStatus = "CLEAR FAILED";
+            return;
+        }
+
+        _rawCount = 0;
+        _optCount = 0;
+        _replayIdx = 0;
+        _state = STATE_MANUAL_IDLE;
+        _flashStatus = "FLASH CLEARED";
+        userLed.setSolid(0, 120, 120);
+    }
+
     // ── Obstacle Sensing ──────────────────────────────────────────────────
     float readFrontDistanceCm() {
         digitalWrite(DIGITAL_D1, LOW);
@@ -224,6 +386,7 @@ private:
     void startRecording(uint32_t now) {
         _rawCount = 0;
         _optCount = 0;
+        _flashStatus = "UNSAVED ROUTE";
         _recordStartMs = now;
         _lastSampleMs = now;
         _state = STATE_RECORDING;
@@ -295,6 +458,7 @@ private:
         }
 
         _state = STATE_OPTIMIZED;
+        _flashStatus = "UNSAVED ROUTE";
         userLed.setSolid(255, 140, 0); // Solid Amber: Optimized & Ready
     }
 
@@ -418,6 +582,32 @@ private:
         telemetry.addData("Speedup", _speedupMultiplier);
         telemetry.addData("Heading", NRLComms::getHeading());
         telemetry.addData("Batt(V)", power.getBatteryVoltage());
+        if (strcmp(_flashStatus, "LOADED FROM FLASH") == 0) {
+            telemetry.addData("Flash", "LOADED FROM");
+            telemetry.addData("Flash2", "FLASH");
+        } else {
+            telemetry.addData("Flash", _flashStatus);
+            telemetry.addData("Flash2", "");
+        }
+        updateFlashDisplay(millis());
+    }
+
+    void updateFlashDisplay(uint32_t now) {
+        if (!_oledAvailable || now - _lastOledRefreshMs < 500) return;
+        _lastOledRefreshMs = now;
+
+        botOled.clearDisplay();
+        botOled.setTextSize(1);
+        botOled.setCursor(0, 0);
+        botOled.print("TEACH & REPEAT");
+        botOled.setCursor(0, 16);
+        botOled.print("MODE: ");
+        botOled.print(_state == STATE_OPTIMIZED ? "OPTIMIZED" :
+                      _state == STATE_RECORDING ? "RECORDING" :
+                      _state == STATE_REPLAYING ? "REPLAYING" : "IDLE");
+        botOled.setCursor(0, 32);
+        botOled.print(_flashStatus);
+        botOled.display();
     }
 };
 

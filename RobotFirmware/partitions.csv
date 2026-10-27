@@ -1,8 +1,9 @@
 # NRL Robot — Custom Partition Table (4MB Flash)
 # Default table gives ~1.4MB app space — not enough for FreeRTOS + NRL libs.
 # app0 is 3MB so there is headroom for future features (OTA, LVGL).
+# The 96KB NVS partition supports Teach & Repeat trajectories up to 28.8KB.
 # Name,     Type,  SubType,  Offset,    Size
-nvs,        data,  nvs,      0x9000,    0x5000
-otadata,    data,  ota,      0xe000,    0x2000
-app0,       app,   ota_0,    0x10000,   0x300000
-spiffs,     data,  spiffs,   0x310000,  0xF0000
+nvs,        data,  nvs,      0x9000,    0x18000
+otadata,    data,  ota,      0x21000,   0x2000
+app0,       app,  ota_0,     0x30000,   0x300000
+spiffs,     data,  spiffs,   0x330000,  0xD0000

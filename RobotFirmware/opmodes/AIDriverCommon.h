@@ -1,8 +1,10 @@
 #pragma once
 #include "NRL.h"
 #include "RobotCalibration.h"
+#include "StarMapPattern.h"
 #include <cmath>
 #include <memory>
+#include <vector>
 
 // ============================================================================
 //  NRL 2026 HYPERDRIVE — AI Driver Common Navigation & Collision Avoidance
@@ -292,6 +294,82 @@ namespace AIDriver {
 
     inline ActionPtr smartDriveInches(float inches, float evadeAngle = 35.0f) {
         return std::make_shared<SmartDriveAction>(inches, evadeAngle);
+    }
+
+    inline ActionPtr retrieveStarMapCore(StarMapCore core) {
+        std::vector<ActionPtr> actions = {
+            armFloor(),
+            openGripper()
+        };
+
+        if (core == StarMapCore::GOLD) {
+            actions.push_back(openVaultGate());
+            actions.push_back(sleep_ms(VAULT_INTAKE_HOLD_MS));
+        }
+
+        actions.push_back(smartDriveInches(4.0f, 35.0f));
+        actions.push_back(closeGripper());
+        actions.push_back(sleep_ms(250));
+        actions.push_back(smartDriveInches(-4.0f, -35.0f));
+
+        if (core == StarMapCore::GOLD) {
+            actions.push_back(closeVaultGate());
+        }
+
+        actions.push_back(armCarry());
+        return sequential(actions);
+    }
+
+    inline ActionPtr starMapScoringActions(float vaultTurn) {
+        std::vector<ActionPtr> actions;
+        const float starTurn = -vaultTurn * 0.5f;
+
+        for (size_t index = 0; index < STAR_MAP_CORE_COUNT; ++index) {
+            const StarMapCore core = starMapCoreAt(starMapPattern, index);
+
+            if (index == 0) {
+                actions.push_back(smartDriveInches(-14.0f, -30.0f));
+                if (core == StarMapCore::GOLD) {
+                    actions.push_back(driveActions.turn(vaultTurn));
+                    actions.push_back(smartDriveInches(22.0f, 30.0f));
+                } else {
+                    actions.push_back(driveActions.turn(180.0f));
+                    actions.push_back(smartDriveInches(30.0f, 35.0f));
+                }
+            } else {
+                actions.push_back(driveActions.turn(-starTurn));
+                actions.push_back(smartDriveInches(-26.0f, -35.0f));
+
+                if (core == StarMapCore::SQUAD) {
+                    actions.push_back(smartDriveInches(-22.0f, -30.0f));
+                    actions.push_back(driveActions.turn(-vaultTurn));
+                    actions.push_back(smartDriveInches(14.0f, 30.0f));
+                    actions.push_back(smartDriveInches(-14.0f, -30.0f));
+                    actions.push_back(driveActions.turn(180.0f));
+                    actions.push_back(smartDriveInches(30.0f, 35.0f));
+                }
+            }
+
+            actions.push_back(retrieveStarMapCore(core));
+
+            if (core == StarMapCore::SQUAD) {
+                actions.push_back(smartDriveInches(-10.0f, -30.0f));
+                actions.push_back(driveActions.turn(180.0f));
+                actions.push_back(smartDriveInches(44.0f, 35.0f));
+                actions.push_back(smartDriveInches(-14.0f, -30.0f));
+                actions.push_back(driveActions.turn(vaultTurn));
+                actions.push_back(smartDriveInches(22.0f, 30.0f));
+            }
+
+            actions.push_back(driveActions.turn(starTurn));
+            actions.push_back(smartDriveInches(26.0f, 35.0f));
+            actions.push_back(armHighPole());
+            actions.push_back(openGripper());
+            actions.push_back(sleep_ms(300));
+            actions.push_back(armCarry());
+        }
+
+        return sequential(actions);
     }
 
     // ── Space Station Autonomous Active Balancer ──────────────────────────────
