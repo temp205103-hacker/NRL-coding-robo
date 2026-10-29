@@ -146,22 +146,48 @@ must share that field's channel instead; set it with `py -3 tools/set-competitio
 ## Flashing the Firmware
 
 ### Robot (Bot)
-1. Install VS Code with the **PlatformIO IDE** extension, then open the
-   `RobotFirmware` folder.
-2. Connect the robot's ESP32-S3 to the computer with a USB **data** cable. For first
-   tests, lift the wheels clear of the floor or disconnect the drive motors.
-3. In PlatformIO, select the `robot` environment and click **Build**. Fix any reported
-   compile errors before continuing.
-4. Click **Upload** (or press `Ctrl+Alt+U`) and select the robot's COM/serial port if
-   prompted. PlatformIO builds the firmware and uploads it to the robot; you do not copy
-   source files onto the robot.
-5. This project uses an expanded NVS partition for Teach & Repeat saved routes. When
-   installing this layout for the first time over older firmware, erase the robot's flash
-   once, then upload again so the new partition table is applied. In the PlatformIO
-   terminal, run `pio run -t erase` from `RobotFirmware`, then click **Upload**. Erasing
-   deletes stored routes and other flash settings.
-6. Restart and run **HW Diagnostics** first. Then use **Calibration Tool** to measure
-   the real robot before driving it or relying on autonomous routes.
+You can build and upload during development; you do not need to wait until the robot or
+program is complete. Each successful upload replaces the firmware currently on the robot.
+
+1. **Install the tools.** Install [VS Code](https://code.visualstudio.com/) and its
+   **PlatformIO IDE** extension. PlatformIO is an extension that runs inside the normal
+   VS Code window; it is not a separate editor. If you have just installed it, reload or
+   restart VS Code.
+2. **Open the project.** In VS Code, choose **File → Open Folder…** and select the
+   `RobotFirmware` folder—the folder containing `platformio.ini`. You can open it in a
+   new VS Code window; that is normal. If you are starting from the downloaded kit, first
+   create your team's project with the project wizard under **Getting Started**, then open
+   the generated project's `RobotFirmware` folder.
+3. **Connect safely.** Connect the robot's ESP32-S3 to the computer using a USB **data**
+   cable, not a charge-only cable. For initial tests, lift the wheels clear of the floor
+   or disconnect the drive motors.
+4. **Build before uploading.** Open PlatformIO's alien-head icon in the VS Code Activity
+   Bar, then use **Project Tasks → robot → General → Build**. You can also use the
+   PlatformIO **Build** button. On the first build, PlatformIO downloads the platform and
+   library dependencies; allow it to finish. Continue only after the build succeeds and
+   fix any reported compile errors first.
+5. **Upload to the robot.** With the robot connected, choose **Upload** from the same
+   PlatformIO controls, or press `Ctrl+Alt+U`. If asked, select the COM/serial port for
+   the robot (on Windows, you can check **Device Manager → Ports (COM & LPT)** while
+   unplugging and reconnecting it to identify the port). PlatformIO builds if needed and
+   transfers the compiled firmware; you do not copy source files onto the robot. Wait for
+   the upload to report success before disconnecting the USB cable.
+6. **Test after upload.** Restart the robot and run **HW Diagnostics** first. Use
+   **Calibration Tool** to measure the real robot before driving it or relying on
+   autonomous routes.
+
+If PlatformIO controls are missing, confirm the opened folder itself contains
+`platformio.ini`, make sure the PlatformIO IDE extension is enabled, and reload the VS
+Code window. If no robot port appears, try a known data cable and another USB port, then
+reconnect the robot and check Device Manager. Close any serial monitor using that port
+before uploading. If the upload still cannot connect, follow the ESP32-S3 board's
+documented boot/download-mode procedure and retry.
+
+This project uses an expanded NVS partition for Teach & Repeat saved routes. When
+installing this layout for the first time over older firmware, erase the robot's flash
+once, then upload again so the new partition table is applied. In the PlatformIO terminal,
+run `pio run -t erase` from `RobotFirmware`, then click **Upload**. Erasing deletes saved
+routes and other flash settings; do not erase for an ordinary code update.
 
 #### Updating code after it has been uploaded
 The robot runs a compiled firmware image; editing files on your computer does not change
