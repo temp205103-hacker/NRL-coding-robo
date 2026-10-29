@@ -149,6 +149,8 @@ must share that field's channel instead; set it with `py -3 tools/set-competitio
 You can build and upload during development; you do not need to wait until the robot or
 program is complete. Each successful upload replaces the firmware currently on the robot.
 
+![Six-step visual guide to opening the PlatformIO project, building, uploading, and testing robot firmware](docs/images/robot-firmware-flashing.svg)
+
 1. **Install the tools.** Install [VS Code](https://code.visualstudio.com/) and its
    **PlatformIO IDE** extension. PlatformIO is an extension that runs inside the normal
    VS Code window; it is not a separate editor. If you have just installed it, reload or
