@@ -12,14 +12,211 @@ their game logic in `opmodes/`; the SDK handles hardware, wireless comms, timing
 
 | Part | Quantity | Used For |
 |------|----------|----------|
-| ESP32-S3 DevKit | 2 | One for Robot, one for Controller |
+| Hexa Command Hub / ESP32-S3 robot board | 1 | Robot control, motor/servo signals, sensors |
+| NRL handheld controller | 1 | Driver controls and telemetry (controller firmware is prebuilt) |
 | Servo motors | Up to 4 | Robot joints/arms |
 | DC motors | Up to 4 | Drive system |
-| SSD1306 OLED (128×64, I2C) | 1 | Robot status display |
-| 240×320 TFT LCD (SPI) | 1 | Controller UI |
-| LSM6DSOX IMU | 1 | Controller orientation |
-| MCP3008 8-ch SPI ADC | 1 | Robot battery-voltage + current sensing |
-| ACS712 current sensor | 2 | DC-motor rail + servo rail current |
+| 128×64 I2C OLED | 1, board-installed | Robot status display |
+| LSM6DSOX IMU | 1, board-installed | Robot tilt and heading |
+| MCP3008 8-channel SPI ADC | 1, board-installed | Battery, current, and external analog inputs |
+| ACS712 current sensors | 2, board-installed | Main and motor-branch current sensing |
+| Ultrasonic distance sensor | Optional | Obstacle distance (D1 trigger, D2 echo) |
+| Analog IR distance sensor | Optional | Additional obstacle distance (ADC_EXT_1) |
+| USB data cable | 1 | Firmware build/upload connection |
+
+> **Before connecting anything:** identify the exact board revision and follow its printed
+> connector labels. The repository defines GPIO signal assignments, but does not document
+> the physical pin order or supply voltage of every motor, servo, digital-I/O, or ADC
+> connector. Never guess connector order from a photograph or wire color. Use the board
+> schematic/label and each device's datasheet. Disconnect the battery while wiring.
+
+---
+
+## Step-by-Step Robot Wiring
+
+This guide matches the pin constants in `RobotFirmware/lib/HexaNRL/src/BoardPins.h` and
+the on-board device setup in `RobotFirmware/lib/HexaNRL/src/RobotConfig.h`. GPIO numbers
+below identify **signal pins inside the firmware**. They are not instructions to attach a
+motor or a power wire directly to an ESP32 GPIO.
+
+### 1. Prepare and identify the hardware
+
+Gather the Hexa Command Hub/robot board, chassis, two drive sides (up to four DC motors
+paired left/right), arm and gripper servos, battery approved for the hub, data-capable USB
+cable, and any optional sensors. Also have the board schematic, sensor datasheets, and a
+multimeter available. Put the robot on a stable stand so its wheels cannot touch the floor.
+
+With the battery disconnected:
+
+1. Find the board's motor-driver output terminals, servo headers, battery input, and the
+   sensor headers identified below. Read their silk-screen labels.
+2. Check that the motor voltage/current, servo rail, and battery are compatible with the
+   hub and the connected devices. The source repository does not specify their electrical
+   ratings; do not infer them from GPIO pin numbers.
+3. Keep loose wires away from wheels, gears, and linkages. Do not connect or disconnect
+   motors or servos while the system is powered.
+
+### 2. Connect the two drive sides
+
+The firmware uses two motor-driver **control signal pairs**:
+
+| Firmware signal | ESP32-S3 GPIO | Connects to |
+|---|---:|---|
+| `MOTOR_L_DIR` | GPIO 5 | Left motor driver's direction input |
+| `MOTOR_L_PWM` | GPIO 10 | Left motor driver's speed/PWM input |
+| `MOTOR_R_DIR` | GPIO 11 | Right motor driver's direction input |
+| `MOTOR_R_PWM` | GPIO 12 | Right motor driver's speed/PWM input |
+
+On the integrated robot board, connect the left-side motor(s) to the board's left motor
+driver output and right-side motor(s) to its right motor driver output, as identified by
+the board labels/official diagram. If using four drive motors, the front and rear motors
+on each side are paired on that side's supported output as specified by the chassis/board
+instructions. GPIO 5, 10, 11, and 12 are logic-control pins: **never
+connect a DC motor directly to those GPIOs**. If using a separate motor driver, its motor
+outputs drive the motors; connect its direction/PWM inputs to the corresponding control
+signals and follow its logic-voltage and common-ground requirements. Do not parallel
+motors unless the driver and board are rated for their combined stall current.
+
+If a wheel turns the wrong way, disconnect power and check the motor/driver wiring and the
+configured right-side inversion (`flipped = true`) before changing software. Keep the
+wheels raised for the first direction test.
+
+### 3. Connect the arm and gripper servos
+
+Use the board's labeled servo headers. The firmware signal assignments are:
+
+| Mechanism | Firmware name | Signal GPIO | Configured starting position |
+|---|---|---:|---:|
+| Arm | `SERVO_1` | GPIO 39 | `ARM_ANGLE_START` (10°) |
+| Gripper | `SERVO_2` | GPIO 40 | `GRIPPER_ANGLE_START` (20°) |
+| Optional Cargo Bay | `SERVO_3` | GPIO 41 | `CARGOBAY_ANGLE_START` (0°) |
+| Optional Vault Gate | `SERVO_4` | GPIO 42 | `VAULT_ANGLE_START` (0°) |
+
+For each servo, align its three-pin plug with the **signal**, **servo supply**, and
+**ground** labels on that exact header. The signal wire goes to the listed GPIO; the other
+two wires go only to the correspondingly marked servo power and ground pins. Servo wire
+colors vary by manufacturer, so follow the servo documentation rather than assuming a
+color convention. The firmware's GPIO is a control signal, not a servo power source.
+Confirm the board's servo-rail voltage and current capacity against the servo datasheet.
+If an approved external servo supply is required, use the board's documented power
+arrangement and a shared signal ground; never feed external voltage into a GPIO.
+
+Fit the arm and gripper horns so they can move freely through their intended range.
+Cargo Bay and Vault Gate are optional team-built mechanisms; leave those headers empty if
+the mechanisms are not installed. Start with low-risk, unloaded movement and adjust the
+limits in `RobotFirmware/opmodes/RobotCalibration.h` before operating near a hard stop.
+
+### 4. Connect an ultrasonic distance sensor (optional)
+
+The obstacle detector and HW Diagnostics expect a trigger/echo sensor on these external
+digital-I/O signal pins:
+
+| Header signal | Board connector signal contact | Firmware name | ESP32-S3 GPIO | Sensor wire |
+|---|---|---|---:|---|
+| D1 | J14 pin 2 | `DIGITAL_D1` | GPIO 35 | `TRIG` |
+| D2 | J15 pin 2 | `DIGITAL_D2` | GPIO 36 | `ECHO` |
+| D3 | J16 pin 2 | `DIGITAL_D3` | GPIO 37 | Not used by this ultrasonic routine |
+
+Connect the sensor's `TRIG` to **J14 pin 2 / D1 / GPIO 35** and `ECHO` to **J15 pin 2 /
+D2 / GPIO 36**. Connect sensor ground to the board's clearly labeled ground. Power the
+sensor only from a supply allowed by its datasheet and the board connector.
+
+> **Protect the ESP32 input:** some common 5 V ultrasonic modules output 5 V on `ECHO`,
+> while the ESP32-S3 GPIO is a 3.3 V logic input. Do not connect a 5 V echo output directly
+> to GPIO 36. Use a suitable logic-level shifter or a correctly calculated resistor
+> divider, and verify the resulting voltage with a meter before connecting it. The
+> repository does not document the remaining J14/J15/J16 connector contacts; do not assume
+> pin 1 or pin 3 is power or ground—use the board's labels/schematic.
+
+The code pulses D1 and measures the D2 echo. If no echo is received, the diagnostic
+reports no valid distance. Mount the sensor facing forward, secure it, and keep it clear
+of the arm and frame.
+
+### 5. Connect an analog IR distance sensor (optional)
+
+Connect the sensor's analog `OUT` to the board connector for `ADC_EXT_1` (MCP3008 CH3).
+Connect sensor ground to the labeled board ground and sensor supply to a voltage permitted
+by both the sensor datasheet and the board connector. The ADC connector is an **MCP3008
+channel, not an ESP32 GPIO**. The other available channels are:
+
+| Firmware name | MCP3008 input |
+|---|---:|
+| `ADC_EXT_1` | CH3 |
+| `ADC_EXT_2` | CH4 |
+| `ADC_EXT_3` | CH5 |
+| `ADC_EXT_4` | CH6 |
+| `ADC_EXT_5` | CH7 |
+
+`ADC_EXT_1` is used by the autonomous obstacle detector for the Sharp IR distance input;
+HW Diagnostics displays its voltage. Read it in code with
+`power.readChannelVoltage(ADC_EXT_1)`. Follow the board/sensor electrical limits: keep the
+analog input between ground and the board's permitted ADC input range, never apply a
+negative voltage, and use an appropriate divider/conditioner if the sensor output could
+exceed that range. The MCP3008's configured reference is 5.0 V; this is **not** permission
+to apply 5 V to an ESP32 GPIO.
+
+### 6. On-board sensors, display, and power monitors
+
+These parts are connected on the robot board and are **not extra student jumper wires**:
+
+| On-board device | Bus / firmware pins | What to do |
+|---|---|---|
+| LSM6DSOX IMU | I²C `Wire`; SDA GPIO 47, SCL GPIO 48; address `0x6B` | Leave its on-board connection in place. Used for heading, pitch/roll, and balance. |
+| Robot OLED | I²C `Wire1`; SDA GPIO 6, SCL GPIO 7; address `0x3C` | Leave its on-board connection in place. Used for robot status/diagnostics. |
+| MCP3008 ADC | SPI CS GPIO 8, SCK GPIO 14, MISO GPIO 9, MOSI GPIO 13 | On-board ADC; its CH0–CH2 are reserved for battery/current sensing. |
+| Battery-voltage input | MCP3008 CH0 | Use the board's marked battery input only; never connect a battery directly to an ADC/GPIO pin. |
+| ACS712 current sensors | MCP3008 CH1 main/total current; CH2 motor-branch current | Board-installed rail sensors. Do not add a second sensor to these ADC channels. Servo current is calculated as total minus motor current. |
+| User RGB status LED | GPIO 38 | Board-installed; controlled by firmware. |
+| Buzzer | GPIO 21 | Use the installed buzzer/marked output; do not drive a high-current load directly from GPIO. |
+
+Although the MCP3008 reference is 5.0 V, the exact external connector power and contact
+order must come from the board revision's silkscreen/schematic. Do not connect external
+I²C/SPI devices to these on-board buses unless you have checked voltage levels, pull-ups,
+address conflicts, and the board wiring first.
+
+### 7. Power up, check, and test in order
+
+1. Recheck every connection against the board labels and this table. Confirm there are no
+   loose strands, shorts, reversed plugs, or wires near moving parts.
+2. With the robot still restrained and wheels raised, connect the battery to the board's
+   marked battery input. Keep motor/servo rails idle during the first power-on so the
+   ACS712 current sensors can capture a clean zero-current baseline.
+3. Connect the robot board to the computer with a USB **data** cable. Open the
+   `RobotFirmware` folder in VS Code, build with PlatformIO, then upload only after a
+   successful build.
+4. Set the handheld controller's WiFi Channel to **6**, matching this repository's
+   `-DNRL_WIFI_CHANNEL=6` setting. Power on the controller and robot and verify the
+   telemetry link.
+5. Start `HW Diagnostics` first. Test one motor side at a time (`X` = left, `A` = right),
+   then select and gently sweep each installed servo. Check battery/current, IMU, OLED,
+   ultrasonic, and IR readings. Keep hands clear and stop immediately if a motor, servo,
+   wire, or driver becomes hot, noisy, or stalls.
+6. Only after basic checks pass, run the Calibration Tool and measure drive/servo travel
+   on the real chassis. Update calibration constants, rebuild, and retest before trying
+   autonomous modes. Perform the first drive test in a clear area with a spotter.
+
+### 8. Common wiring mistakes to avoid
+
+- Never connect a DC motor to an ESP32 GPIO; use the board's motor-driver output.
+- Never power a servo from its signal GPIO; use the labeled servo supply and ground.
+- Never feed 5 V sensor outputs directly into ESP32 digital GPIO; level-shift them first.
+- Never connect battery positive directly to an ADC or GPIO.
+- Do not treat `ADC_EXT_1`…`ADC_EXT_5` as GPIO numbers; they mean MCP3008 CH3…CH7.
+- Do not wire a second current sensor to CH1/CH2; the board's ACS712 sensors already use them.
+- Do not guess header power/ground contact positions or trust wire color alone.
+- Do not test a route with wheels on the floor until the motor directions, servo limits,
+  sensor readings, and stop behavior have been checked with the wheels raised.
+
+### Curriculum connection
+
+This project can be used to practice the engineering cycle of identifying a challenge,
+planning a mechanism and control system, wiring and programming it, testing safely,
+measuring results, and iterating from evidence. The wiring tables above tie those activities
+to this repository's actual board signals and firmware. The public NRL Youth Dashboard URL
+serves a client-rendered portal and did not expose its curriculum text in the accessible
+page source, so this section is a project-to-engineering-learning mapping—not a quotation
+or claim about specific official lesson wording. Check the curriculum in the signed-in
+dashboard and your mentor's instructions for any additional required terminology or rules.
 
 ---
 
@@ -51,44 +248,49 @@ power.getServoCurrent();     // servo rail current (A) — derived: main − mot
 
 The robot's battery voltage is also sent to the Controller and shown in its header.
 
-**MCP3008 channel map / pins** (also in `RobotFirmware/lib/HexaNRL/src/BoardPins.h`):
+**MCP3008 channel map** (ADC inputs are distinct from the SPI communication pins; see
+`RobotFirmware/lib/HexaNRL/src/BoardPins.h`):
 
-| Channel | Signal | SPI pin | GPIO |
-|---------|--------|---------|------|
-| CH0 | Battery voltage sensor | CS | 8 |
-| CH1 | ACS712 #1 — MAIN / total battery current | SCK | 14 |
-| CH2 | ACS712 #2 — DC-motor branch current | MISO | 9 |
-| CH3–CH7 | External ADC breakout connectors | MOSI | 13 |
+| MCP3008 input | Signal |
+|---------------|--------|
+| CH0 | On-board battery-voltage sensor |
+| CH1 | On-board ACS712 #1 — main/total current |
+| CH2 | On-board ACS712 #2 — DC-motor branch current |
+| CH3–CH7 | External ADC connectors `ADC_EXT_1`–`ADC_EXT_5` |
+
+The MCP3008 communicates with the ESP32-S3 over its dedicated SPI pins: CS = GPIO 8,
+SCK = GPIO 14, MISO = GPIO 9, MOSI = GPIO 13. These are board-internal connections; do
+not wire an external ADC to them for the normal project setup.
 
 **Calibration:** VREF = **5.0 V** on this board (not 3.3 V). Defaults come from the verified
 manufacturer batch logs (CH0 941 counts → 11.35 V ⇒ `vbattScale ≈ 2.468`). For trustworthy amps,
 put a DMM in series and adjust `HexaPowerConfig.acsSensitivity`; for trustworthy volts, compare CH0
 against a DMM and adjust `vbattScale`. Keep the rails idle at power-up so `begin()` captures a clean
-ACS712 zero offset. Run the **"Power Test"** OpMode to stream live V / motor-A / servo-A values.
+ACS712 zero offset. The **HW Diagnostics** and **Driver TeleOp** modes report live battery
+voltage and current telemetry; there is no separate "Power Test" OpMode in this repository.
 
 ---
 
-## External I/O & Bench Test ("IO Test")
+## External I/O
 
-The board also breaks out **3 digital-I/O headers** and **5 external ADC ports**, named in
+The board also breaks out **3 external digital-I/O headers** and **5 external ADC ports**, named in
 `RobotFirmware/lib/HexaNRL/src/BoardPins.h`:
 
-| Name | GPIO / Channel | Header |
-|------|----------------|--------|
-| `DIGITAL_D1` / `DIGITAL_D2` / `DIGITAL_D3` | IO35 / IO36 / IO37 | J14 / J15 / J16 (digital I/O) |
-| `ADC_EXT_1` … `ADC_EXT_5` | MCP3008 CH3 … CH7 | external ADC connectors |
+| Name | Signal GPIO / Channel | Header signal contact |
+|------|------------------------|-----------------------|
+| `DIGITAL_D1` | GPIO 35 | J14 pin 2 |
+| `DIGITAL_D2` | GPIO 36 | J15 pin 2 |
+| `DIGITAL_D3` | GPIO 37 | J16 pin 2 |
+| `ADC_EXT_1` … `ADC_EXT_5` | MCP3008 CH3 … CH7 | Corresponding labeled external ADC connector |
 
 Read an external ADC port with the global `power` object: `power.readChannelVoltage(ADC_EXT_1)`.
+The GPIO/channel is the signal assignment, not a connector's complete pinout; use the
+board silk-screen/schematic to identify ground and supply contacts.
 
-The **"IO Test"** OpMode exercises all of these:
-- **Digital:** drives `D1/D2/D3` as outputs, blinking together at ~1 Hz — plug an LED (+resistor)
-  into each header and watch them blink in unison.
-- **Analog:** ramps a PWM signal 0→100→0 % on `DIGITAL_1` (IO1) and streams `adc3…adc7` + `pwm%`
-  to telemetry. Jumper `DIGITAL_1` into an ADC connector and that channel tracks the ramp.
-
-> ⚠️ The ESP32-S3 has **no DAC**, so the ramp is a real PWM square wave. For the ADC to read a
-> *smooth* voltage, low-pass it: `DIGITAL_1 ──[~10 kΩ]──┬── ADC connector`, with `[1 µF]` from that
-> node to GND. An LED (+resistor) on `DIGITAL_1` dims visibly as the ramp falls.
+This firmware uses D1 as the ultrasonic trigger and D2 as the echo input in
+`HW Diagnostics`, the Calibration Tool, and autonomous obstacle detection. `ADC_EXT_1`
+is read as the analog IR input. The repository does not currently register a standalone
+`IO Test` OpMode; D3 and ADC_EXT_2…ADC_EXT_5 are available for custom sensor code.
 
 ---
 
