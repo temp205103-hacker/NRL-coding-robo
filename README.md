@@ -420,13 +420,15 @@ Both devices communicate wirelessly via **ESP-NOW** — no WiFi router needed.
 
 ## Using the Hexa Controller with This Robot
 
-![Labeled Hexa controller buttons, joysticks, screen, indicators, and controls](docs/images/hexa-controller-controls.png)
+![Hexa controller quick guide for Driver TeleOp: stick driving, precision speed, arm, gripper, cargo bay, and vault controls](docs/images/hexa-controller-controls.png)
 
 ![Schematic overview of the controller, robot hub, drive, mechanisms, and sensors](docs/images/robot-system-overview.svg)
 
-The robot connections image is an original **logical schematic**, not an exact-to-scale hardware
-drawing. Controller labels and robot connections reflect this project's firmware. For additional
-NRL program and robot resources, see the [NRL Youth Dashboard](https://nrlportal.theinnovationstory.com/#/youth-dashboard).
+The controller image is a quick reference for **Driver TeleOp**; other OpModes can use different
+button bindings. The robot connections image is an original **logical schematic**, not an
+exact-to-scale hardware drawing. Controller labels and robot connections reflect this project's
+firmware. For additional NRL program and robot resources, see the
+[NRL Youth Dashboard](https://nrlportal.theinnovationstory.com/#/youth-dashboard).
 
 ### Connect and start a mode
 
