@@ -420,12 +420,12 @@ Both devices communicate wirelessly via **ESP-NOW** — no WiFi router needed.
 
 ## Using the Hexa Controller with This Robot
 
-![Schematic map of the Hexa controller sticks, D-pad, buttons, bumpers, and toggles](docs/images/hexa-controller-controls.svg)
+![Labeled Hexa controller buttons, joysticks, screen, indicators, and controls](docs/images/hexa-controller-controls.png)
 
 ![Schematic overview of the controller, robot hub, drive, mechanisms, and sensors](docs/images/robot-system-overview.svg)
 
-These are original **logical schematics**, not product photos or exact-to-scale hardware
-drawings. Button labels and robot connections reflect this project's firmware. For additional
+The robot connections image is an original **logical schematic**, not an exact-to-scale hardware
+drawing. Controller labels and robot connections reflect this project's firmware. For additional
 NRL program and robot resources, see the [NRL Youth Dashboard](https://nrlportal.theinnovationstory.com/#/youth-dashboard).
 
 ### Connect and start a mode
