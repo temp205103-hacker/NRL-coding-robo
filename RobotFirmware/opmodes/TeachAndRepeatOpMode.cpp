@@ -218,7 +218,7 @@ public:
 
 private:
     void handleManualDrive() {
-        drive.drive(gamepad1.leftY(), gamepad1.rightX());
+        drive.drive(-gamepad1.leftY(), gamepad1.rightX());
     }
 
     bool handleStorageCombos(uint32_t now) {
@@ -401,7 +401,7 @@ private:
 
         if (_rawCount < MAX_POINTS) {
             _rawTrajectory[_rawCount] = TrajectoryPoint{
-                .forward      = gamepad1.leftY(),
+                .forward      = -gamepad1.leftY(),
                 .turn         = gamepad1.rightX(),
                 .armAngle     = _targetArm,
                 .gripperAngle = _targetGripper,

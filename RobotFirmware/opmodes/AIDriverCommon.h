@@ -5,6 +5,7 @@
 #include <cmath>
 #include <memory>
 #include <vector>
+#include <utility>
 
 // ============================================================================
 //  NRL 2026 HYPERDRIVE — AI Driver Common Navigation & Collision Avoidance
@@ -27,6 +28,134 @@ static HexaServo   vaultGate  {{ .signalPin = SERVO_4,  .startAngle = VAULT_ANGL
 static TankDrive    drive(leftMotor, rightMotor);
 static DriveActions driveActions(drive);
 static HexaIMU      imu(hexaImuConfig());
+
+class AIDriverMode : public NRLOpMode {
+public:
+    void startAIPhases(std::vector<std::vector<ActionPtr>> phases) {
+        _phases = std::move(phases);
+        _phaseIndex = 0;
+        if (!_phases.empty()) {
+            runAction(sequential(_phases[_phaseIndex]));
+        }
+    }
+
+    void updateAIControl() {
+        if (_manualMode) {
+            if (gamepad1.justPressed(BTN_A)) {
+                _manualMode = false;
+                drive.stop();
+                if (_phaseIndex < _phases.size()) {
+                    runAction(sequential(_phases[_phaseIndex]));
+                }
+                return;
+            }
+
+            if (!_manualReady) {
+                drive.stop();
+                _manualReady = sticksCentered();
+            } else {
+                drive.drive(-gamepad1.leftY(), gamepad1.rightX());
+            }
+            return;
+        }
+
+        if (detectFullCircle()) {
+            cancelActions();
+            drive.stop();
+            if (_phaseIndex < _phases.size()) {
+                ++_phaseIndex;
+            }
+            _manualMode = true;
+            _manualReady = false;
+            resetCircleTracking();
+            return;
+        }
+
+        if (_phaseIndex < _phases.size() && !isActionRunning()) {
+            ++_phaseIndex;
+            if (_phaseIndex < _phases.size()) {
+                runAction(sequential(_phases[_phaseIndex]));
+            }
+        }
+    }
+
+    bool isManualMode() const {
+        return _manualMode;
+    }
+
+    size_t currentAIPhase() const {
+        return _phaseIndex < _phases.size() ? _phaseIndex + 1 : _phases.size();
+    }
+
+    size_t aiPhaseCount() const {
+        return _phases.size();
+    }
+
+private:
+    struct CircleTracker {
+        float lastAngle = 0.0f;
+        float totalAngle = 0.0f;
+        bool tracking = false;
+    };
+
+    std::vector<std::vector<ActionPtr>> _phases;
+    size_t _phaseIndex = 0;
+    bool _manualMode = false;
+    bool _manualReady = false;
+    CircleTracker _leftCircle;
+    CircleTracker _rightCircle;
+
+    static constexpr float CIRCLE_START_RADIUS = 0.70f;
+    static constexpr float CIRCLE_PI = 3.14159265f;
+    static constexpr float CIRCLE_COMPLETE_RADIANS = 6.2831853f;
+
+    static bool accumulateCircle(float x, float y, CircleTracker& tracker) {
+        if (x * x + y * y < CIRCLE_START_RADIUS * CIRCLE_START_RADIUS) {
+            tracker.tracking = false;
+            tracker.totalAngle = 0.0f;
+            return false;
+        }
+
+        const float angle = std::atan2(y, x);
+        if (!tracker.tracking) {
+            tracker.lastAngle = angle;
+            tracker.totalAngle = 0.0f;
+            tracker.tracking = true;
+            return false;
+        }
+
+        float delta = angle - tracker.lastAngle;
+        if (delta > CIRCLE_PI) delta -= 2.0f * CIRCLE_PI;
+        if (delta < -CIRCLE_PI) delta += 2.0f * CIRCLE_PI;
+        tracker.totalAngle += delta;
+        tracker.lastAngle = angle;
+        if (std::fabs(tracker.totalAngle) >= CIRCLE_COMPLETE_RADIANS) {
+            tracker.tracking = false;
+            tracker.totalAngle = 0.0f;
+            return true;
+        }
+        return false;
+    }
+
+    bool detectFullCircle() {
+        const bool left = accumulateCircle(gamepad1.leftX(), gamepad1.leftY(), _leftCircle);
+        const bool right = accumulateCircle(gamepad1.rightX(), gamepad1.rightY(), _rightCircle);
+        return left || right;
+    }
+
+    void resetCircleTracking() {
+        _leftCircle = CircleTracker{};
+        _rightCircle = CircleTracker{};
+    }
+
+    bool sticksCentered() const {
+        constexpr float DEADZONE = 0.15f;
+        return std::fabs(gamepad1.leftX()) < DEADZONE &&
+               std::fabs(gamepad1.leftY()) < DEADZONE &&
+               std::fabs(gamepad1.rightX()) < DEADZONE &&
+               std::fabs(gamepad1.rightY()) < DEADZONE;
+    }
+};
 
 // ============================================================================
 //  Obstacle Detector Subsystem

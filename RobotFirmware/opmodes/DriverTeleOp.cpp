@@ -13,6 +13,8 @@ static TankDrive drive(leftMotor, rightMotor);
 class DriverTeleOp : public NRLOpMode {
 private:
     float _armAngle = ARM_ANGLE_START;
+    uint32_t _lastArmStepMs = 0;
+    static constexpr uint32_t ARM_STEP_INTERVAL_MS = 150;
     bool _gripperClosed = false;
     bool _cargoBayOpen = false;
     bool _vaultGateOpen = false;
@@ -32,7 +34,7 @@ public:
     void loop() override {
         const bool precisionMode = gamepad1.pressed(BTN_LB);
         drive.setScale(precisionMode ? 0.35f : 1.0f);
-        drive.drive(gamepad1.leftY(), gamepad1.rightX());
+        drive.drive(-gamepad1.leftY(), gamepad1.rightX());
 
         if (gamepad1.justPressed(BTN_X) && !isActionRunning()) {
             runAction(sequential({
@@ -49,12 +51,17 @@ public:
         }
 
         if (!isActionRunning()) {
-            if (gamepad1.justPressed(BTN_DPAD_UP)) {
-                _armAngle = ARM_ANGLE_HIGH_POLE;
+            const uint32_t now = millis();
+            if (now - _lastArmStepMs >= ARM_STEP_INTERVAL_MS &&
+                gamepad1.pressed(BTN_DPAD_UP)) {
+                _armAngle = constrain(_armAngle + 5.0f, ARM_ANGLE_FLOOR, ARM_ANGLE_APEX_POLE);
                 arm.setPosition(_armAngle);
-            } else if (gamepad1.justPressed(BTN_DPAD_DOWN)) {
-                _armAngle = ARM_ANGLE_FLOOR;
+                _lastArmStepMs = now;
+            } else if (now - _lastArmStepMs >= ARM_STEP_INTERVAL_MS &&
+                       gamepad1.pressed(BTN_DPAD_DOWN)) {
+                _armAngle = constrain(_armAngle - 5.0f, ARM_ANGLE_FLOOR, ARM_ANGLE_APEX_POLE);
                 arm.setPosition(_armAngle);
+                _lastArmStepMs = now;
             } else if (gamepad1.justPressed(BTN_RB)) {
                 _armAngle = ARM_ANGLE_APEX_POLE;
                 arm.setPosition(_armAngle);
