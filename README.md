@@ -420,14 +420,14 @@ Both devices communicate wirelessly via **ESP-NOW** — no WiFi router needed.
 
 ## Using the Hexa Controller with This Robot
 
-![Hexa controller Driver TeleOp guide with full-word labels for driving, speed, arm, gripper, cargo bay, vault, and exiting the mode](docs/images/hexa-controller-controls.png)
+![Hexa controller guide showing Driver TeleOp controls and the AI mode manual takeover gesture and resume button](docs/images/hexa-controller-controls.png)
 
 ![Schematic overview of the controller, robot hub, drive, mechanisms, and sensors](docs/images/robot-system-overview.svg)
 
-The controller image is a quick reference for **Driver TeleOp**; other OpModes can use different
-button bindings. The robot connections image is an original **logical schematic**, not an
-exact-to-scale hardware drawing. Controller labels and robot connections reflect this project's
-firmware. For additional NRL program and robot resources, see the
+The controller image is a quick reference for **Driver TeleOp** and the AI manual-override gesture;
+other OpModes can use different button bindings. The robot connections image is an original
+**logical schematic**, not an exact-to-scale hardware drawing. Controller labels and robot
+connections reflect this project's firmware. For additional NRL program and robot resources, see the
 [NRL Youth Dashboard](https://nrlportal.theinnovationstory.com/#/youth-dashboard).
 
 ### Connect and start a mode
@@ -457,7 +457,7 @@ robot OLED.
 | **Calibration Tool** | From its menu: `X` starts the 5-second odometry test, `A` selects arm sweep, `Y` gripper, `RB` Cargo Bay, `LB` Vault gate, and `RT` balance/IMU test. During servo tests, D-pad `UP`/`DOWN` changes by 5 degrees and `RIGHT`/`LEFT` fine-tunes by 1 degree. `LT` returns to the calibration menu. Measure physical travel and update `RobotCalibration.h` on the computer; then rebuild and upload. |
 | **Star Map Setup** | Before an AI match, run this TELEOP mode. D-pad `UP`/`DOWN` selects `GOLD-SQUAD-GOLD`, `SQUAD-GOLD-GOLD`, or `GOLD-GOLD-SQUAD`; press `A` to confirm. Stop setup, then choose the Red or Blue AI mode. The selection is held in RAM and resets when firmware restarts. |
 | **Teach & Repeat AI** | Sticks drive manually. `X` starts and stops route recording (stopping optimizes it); `Y` optimizes again; `A` starts replay or aborts replay. `LB` toggles the gripper; D-pad `UP`/`DOWN` adjusts the arm; D-pad `RIGHT`/`LEFT` changes replay speed. Hold `RB+Y` for 1.2 seconds to save the optimized route; hold `RB+LT` for 1.2 seconds to erase the saved and in-memory route. Use telemetry/OLED flash status to confirm. |
-| **AI Driver: Red / Blue / Skills** | Start the selected arena/skills routine in its prescribed start position. Move either stick through a full circle near its outer edge to take manual drive control; center the sticks before driving. Press `A` to resume the same arena routine at its next phase. The phase interrupted by takeover is skipped, not replayed. Obstacle detection/avoidance depends on the corresponding sensors being installed and correctly wired. |
+| **AI Driver: Red / Blue / Skills** | Start the selected arena/skills routine in its prescribed start position. Move either stick through one full circle near its outer edge to take manual drive control. The robot stops while you center both sticks; then manual driving uses the corrected left-stick forward/reverse axis and right-stick turning. Press `A` to resume that arena's AI at the next phase. The interrupted phase is skipped, not replayed, and the next phase assumes its normal starting position. Obstacle detection/avoidance depends on the corresponding sensors being installed and correctly wired. |
 
 `LT`/`RT` refer to the controller's toggle inputs (not the analog triggers found on some
 gamepads). Controls are defined by each OpMode; a button may serve a different purpose in a
@@ -700,13 +700,17 @@ Teach & Repeat loads a validated saved trajectory during INIT. The OLED reports 
 ---
 
 ### 2. Autonomous AI Driver with Collision Avoidance (`AIDriver*.cpp`)
-Fully autonomous, hands-off self-driving modes tailored specifically to the **NRL 2026 HYPERDRIVE** game arenas:
+Self-driving routines tailored specifically to the **NRL 2026 HYPERDRIVE** game arenas. Either stick can take over manual driving with one full circle near its outer edge; center both sticks before driving. Press `A` to continue at the next phase of the selected routine. The phase interrupted by takeover is canceled and skipped, not paused or replayed, so resume only when the robot is positioned for the next phase:
 
 | Mode on Controller | Source File | Description |
 | :--- | :--- | :--- |
 | **`AI Driver: Red`** | `AIDriverRedField.cpp` | Autonomous driver for Red Squad (starts in Red Start Zone). |
 | **`AI Driver: Blue`** | `AIDriverBlueField.cpp` | Autonomous driver for Blue Squad (starts in Blue Start Zone). |
 | **`AI Driver: Skills`** | `AIDriverSkillsChallenge.cpp` | High-yield autonomous cycle for the solo Autonomous Skill Challenge. |
+
+During manual takeover, controller telemetry reports `MANUAL`, the next AI phase, and the `A`
+resume prompt. If the routine has no remaining phases, pressing `A` does not restart completed
+phases.
 
 #### Complete Match Gameplay Cycle
 1. **Spike Mark & High Pole Scoring:** Drives to pre-placed Spike Marks, intakes Core, and stacks onto the High Pole (130 mm height, **+3 pts**).
